@@ -56,6 +56,10 @@ DB_5786_0000/
 ├── docs/
 │   ├── relational_schema.png   # Relational table diagram
 │   └── er_diagram.png          # Entity-Relationship diagram
+├── sql/
+│   └── init.sql                # Database creation & seed script
+├── .env                        # Environment variables (git-ignored)
+├── docker-compose.yml          # Docker PostgreSQL setup
 ├── .gitignore
 └── README.md
 ```
@@ -64,13 +68,53 @@ DB_5786_0000/
 
 ## ⚙️ Technologies
 
-- **Database**: Relational model (SQL)
+- **Database**: PostgreSQL 16 (via Docker)
+- **Container**: Docker / Docker Compose
 - **Application Layer**: Python
 - **Version Control**: Git
 
 ---
 
-## 🚀 Getting Started
+## 🐳 Docker Setup (PostgreSQL)
+
+### Prerequisites
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
+
+### 1. Create your `.env` file
+The `.env` file is already provided. Edit it if you want to change credentials:
+```env
+POSTGRES_DB=restaurant_db
+POSTGRES_USER=admin
+POSTGRES_PASSWORD=admin123
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+```
+
+### 2. Start the database
+```bash
+docker-compose up -d
+```
+PostgreSQL will start and automatically run `sql/init.sql` to create all tables.
+
+### 3. Verify the container is running
+```bash
+docker ps
+```
+
+### 4. Connect to the database
+```bash
+docker exec -it restaurant_db psql -U admin -d restaurant_db
+```
+
+### 5. Stop the database
+```bash
+docker-compose down          # stop (keeps data)
+docker-compose down -v       # stop + delete all data
+```
+
+---
+
+## 🚀 Getting Started (Python App)
 
 1. **Clone the repository**
    ```bash
@@ -78,17 +122,17 @@ DB_5786_0000/
    cd DB_5786_0000
    ```
 
-2. **Set up the Python environment**
+2. **Start the database**
+   ```bash
+   docker-compose up -d
+   ```
+
+3. **Set up the Python environment**
    ```bash
    python -m venv venv
    source venv/bin/activate      # macOS / Linux
    # venv\Scripts\activate       # Windows
    pip install -r requirements.txt
-   ```
-
-3. **Initialize the database**
-   ```bash
-   python setup_db.py
    ```
 
 4. **Run the application**
