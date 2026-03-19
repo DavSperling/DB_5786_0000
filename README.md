@@ -27,7 +27,7 @@ The database is composed of the following **6 tables**:
 
 ### Relational Schema
 
-> 📁 Save the image as `docs/relational_schema.png`
+> 📁 Save the image as `docs/DSD copie.png`
 
 ![Relational Schema](docs/relational_schema.png)
 
