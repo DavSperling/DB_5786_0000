@@ -93,7 +93,6 @@ The bill generated per order.
 * `discount_amount`
 * `bill_time`
 
-![Bill Mockaroo](docs/Bill.jpg)
 
 ### PAYMENT
 Payment record linked to a bill.
@@ -103,7 +102,6 @@ Payment record linked to a bill.
 * `payment_time`
 * `amount`
 
-![Payment Mockaroo](docs/Payment.jpg)
 
 ### DISCOUNT
 Available discounts.
@@ -113,7 +111,6 @@ Available discounts.
 * `valid_from`
 * `valid_to`
 
-![Discount Mockaroo](docs/Discount.jpg)
 
 ### BILL_DISCOUNT
 Junction table linking bills to applied discounts.
@@ -133,9 +130,16 @@ Data for the `BILL_DISCOUNT` junction table was generated using a custom Python 
 
 ### ✅ Method B: Mockaroo Generator
 
-Tables such as `ORDER`, `BILL`, `PAYMENT`, and `DISCOUNT` were populated using [Mockaroo](https://mockaroo.com/), a tool that generates realistic mock data in CSV or SQL format.
+Tables such as `ORDER`,`PAYMENT`, and `DISCOUNT` were populated using [Mockaroo](https://mockaroo.com/), a tool that generates realistic mock data in SQL format.
 
 ![Order Mockaroo](docs/Order.jpg)
+
+
+### ✅ Method C: Mockaroo Generator CSV
+
+Tables `BILL` was populated using [Mockaroo](https://mockaroo.com/), a tool that generates realistic mock data in CSV format.
+
+![Bill Mockaroo](docs/Bill.jpg)
 
 ---
 
