@@ -1,14 +1,43 @@
 # DB_5786_0000 — Restaurant Order & Billing Database
 
-> **Academic Mini-Project | 3rd Year — 2nd Semester**  
+> **Academic Mini-Project | 3rd Year — 2nd Semester**
 > Database Design & Implementation
 
 ---
 
 ## 📋 Project Overview
 
-This project implements a relational database system for managing **restaurant orders, billing, payments, and discounts**.  
+This project implements a relational database system for managing **restaurant orders, billing, payments, and discounts**.
 It covers the full database design lifecycle — from the conceptual Entity-Relationship (ER) model down to the relational schema — and is built using **Python** as the application layer.
+
+The screenshots below represent a **UI mockup** of what the application layer could look like, designed to illustrate the real-world use case of the database.
+
+---
+
+## 🖥️ Application Mockup
+
+### Login
+![Login Screen](docs/login.jpeg)
+
+---
+
+### Dashboard
+![Dashboard](docs/dashboard.jpeg)
+
+---
+
+### Orders & Billing
+![Orders and Billing](docs/order_and_bill.jpeg)
+
+---
+
+### Menu Management
+![Menu Management](docs/menu_management.jpeg)
+
+---
+
+### Staff & Tables
+![Staff and Table Map](docs/staff_table.jpeg)
 
 ---
 
@@ -25,15 +54,11 @@ The database is composed of the following **6 tables**:
 | `DISCOUNT` | Available discounts (name, percentage, validity dates) |
 | `BILL_DISCOUNT` | Junction table linking bills to applied discounts |
 
-### Relational Schema
-
-> 📁 Save the image as `docs/DSD.png`
+### Relational Schema (DSD)
 
 ![Relational Schema](docs/DSD.png)
 
-### Entity-Relationship (ER) Diagram
-
-> 📁 Save the image as `docs/ERD.png`
+### Entity-Relationship Diagram (ERD)
 
 ![ER Diagram](docs/ERD.png)
 
@@ -54,8 +79,13 @@ The database is composed of the following **6 tables**:
 ```
 DB_5786_0000/
 ├── docs/
-│   ├── relational_schema.png   # Relational table diagram
-│   └── er_diagram.png          # Entity-Relationship diagram
+│   ├── DSD.png                 # Relational schema diagram
+│   ├── ERD.png                 # Entity-Relationship diagram
+│   ├── login.jpeg              # UI Mockup — Login screen
+│   ├── dashboard.jpeg          # UI Mockup — Dashboard
+│   ├── order_and_bill.jpeg     # UI Mockup — Orders & Billing
+│   ├── menu_management.jpeg    # UI Mockup — Menu Management
+│   └── staff_table.jpeg        # UI Mockup — Staff & Tables
 ├── sql/
 │   └── init.sql                # Database creation & seed script
 ├── .env                        # Environment variables (git-ignored)
@@ -78,10 +108,13 @@ DB_5786_0000/
 ## 🐳 Docker Setup (PostgreSQL)
 
 ### Prerequisites
+
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
 
 ### 1. Create your `.env` file
+
 The `.env` file is already provided. Edit it if you want to change credentials:
+
 ```env
 POSTGRES_DB=restaurant_db
 POSTGRES_USER=admin
@@ -91,22 +124,27 @@ POSTGRES_PORT=5432
 ```
 
 ### 2. Start the database
+
 ```bash
 docker-compose up -d
 ```
+
 PostgreSQL will start and automatically run `sql/init.sql` to create all tables.
 
 ### 3. Verify the container is running
+
 ```bash
 docker ps
 ```
 
 ### 4. Connect to the database
+
 ```bash
 docker exec -it restaurant_db psql -U admin -d restaurant_db
 ```
 
 ### 5. Stop the database
+
 ```bash
 docker-compose down          # stop (keeps data)
 docker-compose down -v       # stop + delete all data
@@ -144,7 +182,7 @@ docker-compose down -v       # stop + delete all data
 
 ## 👤 Author
 
-**David** — Mahon Lev, 3rd Year  
+**David and Dylan** — Mahon Lev, 3rd Year
 2nd Semester Mini-Project — Database Design
 
 ---
