@@ -84,8 +84,6 @@ Stores customer orders.
 * `order_time`
 * `order_status`
 
-![Order Mockaroo](docs/Order.jpg)
-
 ### BILL
 The bill generated per order.
 * `bill_id` (Primary Key)
@@ -136,6 +134,8 @@ Data for the `BILL_DISCOUNT` junction table was generated using a custom Python 
 ### ✅ Method B: Mockaroo Generator
 
 Tables such as `ORDER`, `BILL`, `PAYMENT`, and `DISCOUNT` were populated using [Mockaroo](https://mockaroo.com/), a tool that generates realistic mock data in CSV or SQL format.
+
+![Order Mockaroo](docs/Order.jpg)
 
 ---
 
