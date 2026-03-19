@@ -33,9 +33,9 @@ The database is composed of the following **6 tables**:
 
 ### Entity-Relationship (ER) Diagram
 
-> 📁 Save the image as `docs/er_diagram.png`
+> 📁 Save the image as `docs/ERD.png`
 
-![ER Diagram](docs/er_diagram.png)
+![ER Diagram](docs/ERD.png)
 
 ---
 
