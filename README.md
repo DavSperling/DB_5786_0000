@@ -1,119 +1,166 @@
 # DB_5786_0000 — Restaurant Order & Billing Database
 
-> **Academic Mini-Project | 3rd Year — 2nd Semester**
-> Database Design & Implementation
+📘 Project Report
+This project is a restaurant order and billing database management system. It was developed as part of a database course project.
 
 ---
 
-## 📋 Project Overview
+## 🧑‍💻 Authors
 
-This project implements a relational database system for managing **restaurant orders, billing, payments, and discounts**.
-It covers the full database design lifecycle — from the conceptual Entity-Relationship (ER) model down to the relational schema — and is built using **Python** as the application layer.
+* Dylan Athouel
+* David Sperling
+
+---
+
+## 🏢 Project Scope
+
+* **System:** Restaurant Management System
+* **Unit:** Order & Billing Department
+
+---
+
+## 📌 Table of Contents
+
+1. [Overview](#overview)
+2. [Application Mockup (UI)](#application-mockup-ui)
+3. [ERD and DSD Diagrams](#erd-and-dsd-diagrams)
+4. [Data Structure Description](#data-structure-description)
+5. [Data Insertion Methods](#data-insertion-methods)
+6. [Backup & Restore](#backup--restore)
+7. [Docker Setup](#docker-setup-postgresql)
+8. [Getting Started](#getting-started-python-app)
+
+---
+
+## 🧾 Overview
+
+This database system is designed to manage the operational and financial activities of a restaurant. It includes data about orders, order items, bills, payments, discounts, and billing history.
+
+The system uses foreign keys, weak entities, and entity relationships to maintain data consistency and avoid redundancy.
+
+---
+
+## 🖥️ Application Mockup (UI)
 
 The screenshots below represent a **UI mockup** of what the application layer could look like, designed to illustrate the real-world use case of the database.
-
----
-
-## 🖥️ Application Mockup
 
 ### Login
 ![Login Screen](docs/login.jpeg)
 
----
-
 ### Dashboard
 ![Dashboard](docs/dashboard.jpeg)
-
----
 
 ### Orders & Billing
 ![Orders and Billing](docs/order_and_bill.jpeg)
 
----
-
 ### Menu Management
 ![Menu Management](docs/menu_management.jpeg)
-
----
 
 ### Staff & Tables
 ![Staff and Table Map](docs/staff_table.jpeg)
 
 ---
 
-## 🗂️ Database Schema
+## 🗂️ ERD and DSD Diagrams
 
-The database is composed of the following **6 tables**:
-
-| Table | Description |
-|---|---|
-| `ORDER` | Stores customer orders (status, time, waiter, customer) |
-| `ORDER_ITEM` | Each item within an order (quantity, special request, menu item) |
-| `BILL` | The bill generated per order (total amount, tax, discount, final amount) |
-| `PAYMENT` | Payment record linked to a bill (method, time, amount) |
-| `DISCOUNT` | Available discounts (name, percentage, validity dates) |
-| `BILL_DISCOUNT` | Junction table linking bills to applied discounts |
-
-### Relational Schema (DSD)
-
-![Relational Schema](docs/DSD.png)
-
-### Entity-Relationship Diagram (ERD)
-
+### ERD
 ![ER Diagram](docs/ERD.png)
 
----
-
-## 🔗 Relationships
-
-- An **Order** contains one or more **Order Items** (each linked to a menu item).
-- An **Order** generates exactly one **Bill**.
-- A **Bill** is paid via one **Payment**.
-- A **Bill** can have zero or more **Discounts** applied through the **Bill_Discount** junction table.
-- A **Discount** can be applied to multiple bills.
+### DSD
+![Relational Schema](docs/DSD.png)
 
 ---
 
-## 🏗️ Project Structure
+## 🗃️ Data Structure Description
 
-```
-DB_5786_0000/
-├── docs/
-│   ├── DSD.png                 # Relational schema diagram
-│   ├── ERD.png                 # Entity-Relationship diagram
-│   ├── login.jpeg              # UI Mockup — Login screen
-│   ├── dashboard.jpeg          # UI Mockup — Dashboard
-│   ├── order_and_bill.jpeg     # UI Mockup — Orders & Billing
-│   ├── menu_management.jpeg    # UI Mockup — Menu Management
-│   └── staff_table.jpeg        # UI Mockup — Staff & Tables
-├── sql/
-│   └── init.sql                # Database creation & seed script
-├── .env                        # Environment variables (git-ignored)
-├── docker-compose.yml          # Docker PostgreSQL setup
-├── .gitignore
-└── README.md
-```
+Below is a summary of the main entities and their fields:
+
+### ORDER
+Stores customer orders.
+* `order_id` (Primary Key)
+* `table_id`
+* `customer_id`
+* `waiter_id`
+* `order_time`
+* `order_status`
+
+![Order Mockaroo](docs/Order.jpg)
+
+### BILL
+The bill generated per order.
+* `bill_id` (Primary Key)
+* `order_id` (Foreign Key)
+* `total_amount`
+* `tax`
+* `discount_amount`
+* `bill_time`
+
+![Bill Mockaroo](docs/Bill.jpg)
+
+### PAYMENT
+Payment record linked to a bill.
+* `payment_id` (Primary Key)
+* `bill_id` (Foreign Key)
+* `payment_method`
+* `payment_time`
+* `amount`
+
+![Payment Mockaroo](docs/Payment.jpg)
+
+### DISCOUNT
+Available discounts.
+* `discount_id` (Primary Key)
+* `discount_name`
+* `percentage`
+* `valid_from`
+* `valid_to`
+
+![Discount Mockaroo](docs/Discount.jpg)
+
+### BILL_DISCOUNT
+Junction table linking bills to applied discounts.
+* `bill_discount_id` (Primary Key)
+* `bill_id` (Foreign Key)
+* `discount_id` (Foreign Key)
 
 ---
 
-## ⚙️ Technologies
+## 📥 Data Insertion Methods
 
-- **Database**: PostgreSQL 16 (via Docker)
-- **Container**: Docker / Docker Compose
-- **Application Layer**: Python
-- **Version Control**: Git
+### ✅ Method A: Python Script
+
+Data for the `BILL_DISCOUNT` junction table was generated using a custom Python script that produces 20,000 INSERT statements into a `.sql` file.
+
+![Python Script](docs/python_script.jpeg)
+
+### ✅ Method B: Mockaroo Generator
+
+Tables such as `ORDER`, `BILL`, `PAYMENT`, and `DISCOUNT` were populated using [Mockaroo](https://mockaroo.com/), a tool that generates realistic mock data in CSV or SQL format.
+
+---
+
+## 💾 Backup & Restore
+
+### Backup
+
+A full backup of the `restaurant_db` database was performed using pgAdmin.
+
+![Backup](docs/backup.jpeg)
+
+### Restore
+
+The backup was successfully restored into a test database to verify data integrity.
+
+![Restore](docs/restore.jpeg)
 
 ---
 
 ## 🐳 Docker Setup (PostgreSQL)
 
 ### Prerequisites
-
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running
 
 ### 1. Create your `.env` file
-
-The `.env` file is already provided. Edit it if you want to change credentials:
 
 ```env
 POSTGRES_DB=restaurant_db
@@ -128,8 +175,6 @@ POSTGRES_PORT=5432
 ```bash
 docker-compose up -d
 ```
-
-PostgreSQL will start and automatically run `sql/init.sql` to create all tables.
 
 ### 3. Verify the container is running
 
@@ -180,10 +225,13 @@ docker-compose down -v       # stop + delete all data
 
 ---
 
-## 👤 Author
+## ⚙️ Technologies
 
-**David and Dylan** — Mahon Lev, 3rd Year
-2nd Semester Mini-Project — Database Design
+- **Database**: PostgreSQL 16 (via Docker)
+- **Container**: Docker / Docker Compose
+- **Application Layer**: Python
+- **Mock Data**: Mockaroo, Python script
+- **Version Control**: Git
 
 ---
 
