@@ -233,10 +233,19 @@ ORDER BY amount_saved DESC;
 
 **Version B — Using Subquery**
 ```sql
--- TODO: add select_2b.jpg
+SELECT b.bill_id, b.total_amount,
+       d.discount_name, d.percentage,
+       ROUND(b.total_amount * d.percentage / 100, 2) AS amount_saved
+FROM BILL b, BILL_DISCOUNT bd, DISCOUNT d
+WHERE EXISTS (
+    SELECT 1 FROM BILL_DISCOUNT bd2
+    WHERE bd2.bill_id = b.bill_id AND bd2.discount_id = d.discount_id
+)
+AND bd.bill_id = b.bill_id AND bd.discount_id = d.discount_id
+ORDER BY amount_saved DESC;
 ```
 
-<!-- TODO: add image docs/select_2b.jpg -->
+![Select 2B - Subquery](docs/select2_b.jpg)
 
 ---
 
@@ -420,14 +429,15 @@ For each UPDATE query, the state of the database **before** and **after** the op
 
 ---
 
-### UPDATE 1 — Set Stale "Pending" Orders to "Cancelled"
+### UPDATE 1 — Set Stale "In Progress" Orders to "Cancelled"
 
-> All orders with status `Pending` that were placed more than 2 hours ago are automatically set to `Cancelled`. This simulates a cleanup of stale or forgotten orders.
+> All orders with status `In Progress` placed more than 2 years ago are automatically set to `Cancelled`.
 ```sql
 UPDATE "ORDER"
 SET order_status = 'Cancelled'
-WHERE order_status = 'Pending'
-  AND order_time < NOW() - INTERVAL '2 hours';
+WHERE order_status = 'In Progress'
+  AND order_time < NOW() - INTERVAL '2 years'
+RETURNING *;
 ```
 
 **Before:**
@@ -436,7 +446,7 @@ WHERE order_status = 'Pending'
 
 **After:**
 
-<!-- TODO: add image docs/update_1.jpg -->
+![Update 1 - Result](docs/update_1.jpg)
 
 ---
 
@@ -456,6 +466,25 @@ RETURNING *;
 **After (RETURNING \*):**
 
 ![Update 2 - Result](docs/update_2.jpg)
+
+---
+
+### UPDATE 3 — Extend All Discount Validity by 1 Month
+
+> All discount expiration dates (`valid_to`) are extended by one month. Useful to bulk-renew active promotions.
+```sql
+UPDATE DISCOUNT
+SET valid_to = valid_to + INTERVAL '1 month'
+RETURNING *;
+```
+
+**Before:**
+
+![Discount Table Before Update 3](docs/discount_before.jpg)
+
+**After (RETURNING \*):**
+
+![Update 3 - Result](docs/update_3.jpg)
 
 ---
 
@@ -479,7 +508,7 @@ WHERE amount < 5;
 
 **After:**
 
-<!-- TODO: add image docs/delete_1_after.jpg -->
+![Delete 1 - After (PAYMENT table cleaned)](docs/delete_1.jpg)
 
 ---
 
@@ -497,7 +526,7 @@ WHERE valid_to < CURRENT_DATE - INTERVAL '1 year';
 
 **After:**
 
-<!-- TODO: add image docs/delete_2_after.jpg -->
+![Delete 2 - After (expired discounts removed)](docs/delete_2.jpg)
 
 ---
 
@@ -516,7 +545,7 @@ WHERE order_status = 'Cancelled'
 
 **After:**
 
-<!-- TODO: add image docs/delete_3_after.jpg -->
+![Delete 3 - After (orphaned cancelled orders removed)](docs/delete_3.jpg)
 
 ---
 
@@ -583,6 +612,16 @@ VALUES (999, 'Super Promo', 150.00, '2025-01-01', '2025-12-31');
 
 ---
 
+## 💾 Stage 2 — Backup & Restore Verification
+
+A new backup of the `restaurant_db` database was performed after all Stage 2 operations (queries, updates, deletes, constraints) to ensure data integrity is preserved.
+
+The pgAdmin job history confirms both the **Backup** and **Restore** operations completed successfully.
+
+![Backup & Restore History - Stage 2](docs/backup_2.jpg)
+
+---
+
 ## 🔄 Transactions — ROLLBACK & COMMIT
 
 ---
@@ -617,7 +656,7 @@ SELECT bill_id, total_amount, tax, discount_amount FROM BILL;
 
 **State after ROLLBACK — original values restored:**
 
-<!-- TODO: add image docs/rollback_after.jpg -->
+![State after ROLLBACK - original values restored](docs/discount_before.jpg)
 
 ---
 
