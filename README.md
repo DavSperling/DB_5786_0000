@@ -23,9 +23,9 @@ This project is a restaurant order and billing database management system. It wa
 
 ### 🔵 Stage 1
 1. [Overview](#-overview)
-2. [Application Mockup (UI)](#-application-mockup-ui)
-3. [ERD and DSD Diagrams](#-erd-and-dsd-diagrams)
-4. [Data Structure Description](#-data-structure-description)
+2. [Application Mockup (UI)](#--application-mockup-ui)
+3. [ERD and DSD Diagrams](#--erd-and-dsd-diagrams)
+4. [Data Structure Description](#--data-structure-description)
 5. [Data Insertion Methods](#-data-insertion-methods)
 6. [Backup & Restore](#-backup--restore)
 7. [Docker Setup](#-docker-setup-postgresql)
