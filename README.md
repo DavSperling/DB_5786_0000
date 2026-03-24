@@ -159,6 +159,502 @@ The backup was successfully restored into a test database to verify data integri
 
 ---
 
+# 🟠 Stage 2 — Queries, Constraints & Transactions
+
+---
+
+## 🔍 SELECT Queries — Dual Form (JOIN vs Subquery)
+
+For each of the following 4 queries, two equivalent versions are provided:
+- **Version A** using an explicit `JOIN`
+- **Version B** using a `Subquery`
+
+Both return the same result, but differ in readability and execution efficiency.
+
+---
+
+### Query 1 — Orders with Bill & Payment Details
+
+> Retrieves each order along with its total bill amount, tax, and payment method, ordered by total amount descending.
+
+**Version A — Using JOIN**
+```sql
+SELECT o.order_id, o.order_status, o.order_time,
+       b.total_amount, b.tax, p.payment_method
+FROM "ORDER" o
+JOIN BILL b ON o.order_id = b.order_id
+JOIN PAYMENT p ON b.bill_id = p.bill_id
+ORDER BY b.total_amount DESC;
+```
+
+![Select 1A - JOIN](docs/select_1a.jpg)
+
+---
+
+**Version B — Using Correlated Subqueries**
+```sql
+SELECT o.order_id, o.order_status, o.order_time,
+       (SELECT b.total_amount FROM BILL b WHERE b.order_id = o.order_id) AS total_amount,
+       (SELECT b.tax FROM BILL b WHERE b.order_id = o.order_id) AS tax,
+       (SELECT p.payment_method FROM PAYMENT p
+        JOIN BILL b ON p.bill_id = b.bill_id
+        WHERE b.order_id = o.order_id LIMIT 1) AS payment_method
+FROM "ORDER" o
+ORDER BY total_amount DESC;
+```
+
+![Select 1B - Subquery](docs/select_1b.jpg)
+
+---
+
+> **📊 Efficiency Comparison:**
+> Version A (JOIN) is significantly more efficient. The query planner executes a **single pass** over the joined tables and can leverage indexes on foreign keys. Version B (Correlated Subquery) executes **one subquery per row** of the outer `ORDER` table, resulting in O(n) additional queries — this becomes very costly as data grows. For 500 orders, Version B may execute over 1,500 subqueries internally. **JOIN is the preferred approach in production.**
+
+---
+
+### Query 2 — Bills with Applied Discounts & Savings
+
+> Retrieves each bill along with the applied discount name, percentage, and the actual amount saved, ordered by savings descending.
+
+**Version A — Using JOIN**
+```sql
+SELECT b.bill_id, b.total_amount,
+       d.discount_name, d.percentage,
+       ROUND(b.total_amount * d.percentage / 100, 2) AS amount_saved
+FROM BILL b
+JOIN BILL_DISCOUNT bd ON b.bill_id = bd.bill_id
+JOIN DISCOUNT d ON bd.discount_id = d.discount_id
+ORDER BY amount_saved DESC;
+```
+
+![Select 2A - JOIN](docs/select_2a.jpg)
+
+---
+
+**Version B — Using Subquery**
+```sql
+-- TODO: add select_2b.jpg
+```
+
+<!-- TODO: add image docs/select_2b.jpg -->
+
+---
+
+> **📊 Efficiency Comparison:**
+> Version A (JOIN) is more efficient here as well, because the three-table join is handled in a single execution plan. PostgreSQL's optimizer can use the junction table `BILL_DISCOUNT` efficiently with indexed foreign keys. Version B using subqueries would require nested lookups for each bill, increasing execution time significantly on large datasets. **JOIN is preferred for multi-table relationships.**
+
+---
+
+### Query 3 — Waiter Performance by Month
+
+> Retrieves each waiter's total number of orders and total revenue generated, grouped by month and year.
+
+**Version A — Using JOIN**
+```sql
+SELECT o.waiter_id,
+       EXTRACT(YEAR FROM o.order_time) AS year,
+       EXTRACT(MONTH FROM o.order_time) AS month,
+       COUNT(o.order_id) AS total_orders,
+       SUM(b.total_amount) AS total_revenue
+FROM "ORDER" o
+JOIN BILL b ON o.order_id = b.order_id
+GROUP BY o.waiter_id, EXTRACT(YEAR FROM o.order_time), EXTRACT(MONTH FROM o.order_time)
+ORDER BY year, month, total_orders DESC;
+```
+
+![Select 3A - JOIN](docs/select_3a.jpg)
+
+---
+
+**Version B — Using Subquery (Derived Table)**
+```sql
+SELECT waiter_id, year, month,
+       COUNT(*) AS total_orders,
+       SUM(total_amount) AS total_revenue
+FROM (
+    SELECT o.waiter_id, o.order_id,
+           EXTRACT(YEAR FROM o.order_time) AS year,
+           EXTRACT(MONTH FROM o.order_time) AS month,
+           b.total_amount
+    FROM "ORDER" o
+    JOIN BILL b ON o.order_id = b.order_id
+) AS sub
+GROUP BY waiter_id, year, month
+ORDER BY year, month, total_orders DESC;
+```
+
+![Select 3B - Subquery](docs/select_3b.jpg)
+
+---
+
+> **📊 Efficiency Comparison:**
+> Both versions produce identical results and have similar execution plans — the subquery in Version B is a **derived table** (non-correlated), which PostgreSQL inlines and optimizes similarly to a JOIN. However, Version A is slightly more readable and avoids the extra subquery layer. For analytical queries like this one, the difference is minimal, but **Version A (direct JOIN) is cleaner and equally efficient.**
+
+---
+
+### Query 4 — Payment Method Statistics by Month
+
+> Retrieves payment method usage count and total amount paid, grouped by method, year, and month.
+
+**Version A — Using JOIN**
+```sql
+SELECT p.payment_method,
+       EXTRACT(YEAR FROM p.payment_time) AS year,
+       EXTRACT(MONTH FROM p.payment_time) AS month,
+       COUNT(p.payment_id) AS usage_count,
+       SUM(p.amount) AS total_paid
+FROM PAYMENT p
+JOIN BILL b ON p.bill_id = b.bill_id
+GROUP BY p.payment_method, EXTRACT(YEAR FROM p.payment_time), EXTRACT(MONTH FROM p.payment_time)
+ORDER BY year, month, usage_count DESC;
+```
+
+![Select 4A - JOIN](docs/select_4a.jpg)
+
+---
+
+**Version B — Using Subquery (WHERE IN)**
+```sql
+SELECT payment_method, year, month,
+       COUNT(*) AS usage_count,
+       SUM(amount) AS total_paid
+FROM (
+    SELECT p.payment_method, p.amount,
+           EXTRACT(YEAR FROM p.payment_time) AS year,
+           EXTRACT(MONTH FROM p.payment_time) AS month
+    FROM PAYMENT p
+    WHERE p.bill_id IN (SELECT bill_id FROM BILL)
+) AS sub
+GROUP BY payment_method, year, month
+ORDER BY year, month, usage_count DESC;
+```
+
+![Select 4B - Subquery](docs/select_4b.jpg)
+
+---
+
+> **📊 Efficiency Comparison:**
+> Version A (JOIN) is more efficient. The `WHERE bill_id IN (SELECT ...)` in Version B forces PostgreSQL to first evaluate the full subquery and build a hash set of all `bill_id` values before filtering. While PostgreSQL often optimizes this into a semi-join internally, it adds overhead compared to a direct JOIN, especially on large tables. **Version A is preferred for both clarity and performance.**
+
+---
+
+## 🔍 SELECT Queries — Additional
+
+The following 4 queries each demonstrate a specific analytical use case for the restaurant database.
+
+---
+
+### Query 5 — Orders Containing Special Requests
+
+> Retrieves all order items that include a special request (e.g., "No salt", "Gluten free"), joined with their parent order details, sorted by most recent order.
+```sql
+SELECT o.order_id, o.order_time, o.order_status,
+       oi.menu_item_id, oi.quantity, oi.special_request
+FROM "ORDER" o
+JOIN ORDER_ITEM oi ON o.order_id = oi.order_id
+WHERE oi.special_request IS NOT NULL
+ORDER BY o.order_time DESC;
+```
+
+![Select 5 - Special Requests](docs/select_5.jpg)
+
+---
+
+### Query 6 — Daily Revenue Report
+
+> Aggregates the number of bills, total revenue, and total tax collected per day, sorted from most recent to oldest.
+```sql
+SELECT EXTRACT(DAY FROM b.bill_time) AS day,
+       EXTRACT(MONTH FROM b.bill_time) AS month,
+       EXTRACT(YEAR FROM b.bill_time) AS year,
+       COUNT(b.bill_id) AS nb_bills,
+       SUM(b.total_amount) AS daily_revenue,
+       SUM(b.tax) AS daily_tax
+FROM BILL b
+GROUP BY EXTRACT(YEAR FROM b.bill_time),
+         EXTRACT(MONTH FROM b.bill_time),
+         EXTRACT(DAY FROM b.bill_time)
+ORDER BY year DESC, month DESC, day DESC;
+```
+
+![Select 6 - Daily Revenue](docs/select_6.jpg)
+
+---
+
+### Query 7 — Cancelled Orders with Their Items
+
+> Retrieves all order items belonging to cancelled orders, including the waiter, menu item, quantity, and date, sorted by most recent.
+```sql
+SELECT o.order_id, o.order_time, o.waiter_id,
+       oi.menu_item_id, oi.quantity,
+       EXTRACT(YEAR FROM o.order_time) AS annee,
+       EXTRACT(MONTH FROM o.order_time) AS mois
+FROM "ORDER" o
+JOIN ORDER_ITEM oi ON o.order_id = oi.order_id
+WHERE o.order_status = 'Cancelled'
+ORDER BY o.order_time DESC;
+```
+
+![Select 7 - Cancelled Orders](docs/select_7.jpg)
+
+---
+
+### Query 8 — Discounts Ranked by Percentage with Duration
+
+> Lists all discounts sorted by percentage descending, with a computed column showing the number of days each discount is valid.
+```sql
+SELECT d.discount_id, d.discount_name, d.percentage,
+       d.valid_from, d.valid_to,
+       (d.valid_to - d.valid_from) AS duree_jours
+FROM DISCOUNT d
+ORDER BY d.percentage DESC;
+```
+
+![Select 8 - Discounts by Percentage](docs/select_8.jpg)
+
+---
+
+## ✏️ UPDATE Queries
+
+For each UPDATE query, the state of the database **before** and **after** the operation is shown.
+
+---
+
+### UPDATE 1 — Set Stale "Pending" Orders to "Cancelled"
+
+> All orders with status `Pending` that were placed more than 2 hours ago are automatically set to `Cancelled`. This simulates a cleanup of stale or forgotten orders.
+```sql
+UPDATE "ORDER"
+SET order_status = 'Cancelled'
+WHERE order_status = 'Pending'
+  AND order_time < NOW() - INTERVAL '2 hours';
+```
+
+**Before:**
+
+![Order Table Before Update 1](docs/order_before.jpg)
+
+**After:**
+
+<!-- TODO: add image docs/update_1.jpg -->
+
+---
+
+### UPDATE 2 — Shift All Order Times by +1 Day
+
+> All order timestamps are incremented by one day. This query demonstrates a bulk date update with `RETURNING *` to immediately visualize the changes.
+```sql
+UPDATE "ORDER"
+SET order_time = order_time + INTERVAL '1 day'
+RETURNING *;
+```
+
+**Before:**
+
+![Order Table Before Update 2](docs/order_before.jpg)
+
+**After (RETURNING \*):**
+
+![Update 2 - Result](docs/update_2.jpg)
+
+---
+
+## 🗑️ DELETE Queries
+
+For each DELETE query, the state of the relevant table **before** and **after** the operation is shown.
+
+---
+
+### DELETE 1 — Remove Payments Under 5€ (Data Entry Errors)
+
+> Payments with an amount less than 5€ are considered data entry errors and are removed from the `PAYMENT` table.
+```sql
+DELETE FROM PAYMENT
+WHERE amount < 5;
+```
+
+**Before:**
+
+![Payment Table Before Delete](docs/payement_before.jpg)
+
+**After:**
+
+<!-- TODO: add image docs/delete_1_after.jpg -->
+
+---
+
+### DELETE 2 — Remove Discounts Expired More Than 1 Year Ago
+
+> Discounts whose `valid_to` date is more than one year in the past are cleaned up from the `DISCOUNT` table.
+```sql
+DELETE FROM DISCOUNT
+WHERE valid_to < CURRENT_DATE - INTERVAL '1 year';
+```
+
+**Before:**
+
+![Discount Table Before Delete](docs/discount_before.jpg)
+
+**After:**
+
+<!-- TODO: add image docs/delete_2_after.jpg -->
+
+---
+
+### DELETE 3 — Remove Cancelled Orders With No Associated Bill
+
+> Cancelled orders that never generated a bill are orphaned records. This query removes them to keep the database clean.
+```sql
+DELETE FROM "ORDER"
+WHERE order_status = 'Cancelled'
+  AND order_id NOT IN (SELECT order_id FROM BILL);
+```
+
+**Before:**
+
+![Order Table Before Delete](docs/order_before.jpg)
+
+**After:**
+
+<!-- TODO: add image docs/delete_3_after.jpg -->
+
+---
+
+## 🔒 Constraints (CHECK)
+
+The following `CHECK` constraints were added to the database using `ALTER TABLE` to enforce data integrity rules. Each section demonstrates the constraint violation with an intentional bad `INSERT`.
+
+---
+
+### Constraint 1 — Tax Must Be Non-Negative (`BILL` table)
+
+> **ALTER TABLE change:** A `CHECK` constraint named `check_tax` was added to the `BILL` table to ensure that the `tax` column cannot contain negative values.
+```sql
+ALTER TABLE BILL ADD CONSTRAINT check_tax CHECK (tax >= 0);
+```
+
+**Violation test — inserting a negative tax:**
+```sql
+INSERT INTO BILL (bill_id, order_id, total_amount, tax, discount_amount, final_amount, bill_time)
+VALUES (999, 1, 50.00, -5.00, 0, 45.00, CURRENT_TIMESTAMP);
+```
+
+![Constraint 1 - Check Tax Error](docs/constraint_1.jpg)
+
+> ❌ The database correctly rejects the insertion with: `ERROR: new row for relation "bill" violates check constraint "check_tax"`
+
+---
+
+### Constraint 2 — Payment Amount Must Be Positive (`PAYMENT` table)
+
+> **ALTER TABLE change:** A `CHECK` constraint named `check_payment_amount` was added to the `PAYMENT` table to ensure that the `amount` column must be strictly greater than zero.
+```sql
+ALTER TABLE PAYMENT ADD CONSTRAINT check_payment_amount CHECK (amount > 0);
+```
+
+**Violation test — inserting a zero amount:**
+```sql
+INSERT INTO PAYMENT (payment_id, bill_id, payment_method, payment_time, amount)
+VALUES (999, 1, 'Cash', CURRENT_TIMESTAMP, 0);
+```
+
+![Constraint 2 - Check Payment Amount Error](docs/constraint_2.jpg)
+
+> ❌ The database correctly rejects the insertion with: `ERROR: new row for relation "payment" violates check constraint "check_payment_amount"`
+
+---
+
+### Constraint 3 — Discount Percentage Must Be Between 0 and 100 (`DISCOUNT` table)
+
+> **ALTER TABLE change:** A `CHECK` constraint named `check_percentage` was added to the `DISCOUNT` table to prevent discount percentages above 100% or below 0%.
+```sql
+ALTER TABLE DISCOUNT ADD CONSTRAINT check_percentage CHECK (percentage BETWEEN 0 AND 100);
+```
+
+**Violation test — inserting a percentage of 150:**
+```sql
+INSERT INTO DISCOUNT (discount_id, discount_name, percentage, valid_from, valid_to)
+VALUES (999, 'Super Promo', 150.00, '2025-01-01', '2025-12-31');
+```
+
+![Constraint 3 - Check Percentage Error](docs/constraint_3.jpg)
+
+> ❌ The database correctly rejects the insertion with: `ERROR: new row for relation "discount" violates check constraint "check_percentage"`
+
+---
+
+## 🔄 Transactions — ROLLBACK & COMMIT
+
+---
+
+### ROLLBACK Example — Undoing a Bulk Discount Update
+
+> This transaction demonstrates the `ROLLBACK` mechanism. A bulk update sets `discount_amount = 10.00` for all bills. The transaction is then rolled back, restoring the original values.
+```sql
+-- Step 1: View initial state
+SELECT bill_id, total_amount, tax, discount_amount FROM BILL;
+
+BEGIN;
+
+-- Step 2: Update all bills — set discount to 10.00
+UPDATE BILL
+SET discount_amount = 10.00
+RETURNING *;
+
+-- Step 3: View state after update
+SELECT bill_id, total_amount, tax, discount_amount FROM BILL;
+
+-- Step 4: Cancel the update
+ROLLBACK;
+
+-- Step 5: View state after rollback (original values restored)
+SELECT bill_id, total_amount, tax, discount_amount FROM BILL;
+```
+
+**State after UPDATE (before ROLLBACK) — all discount_amount = 10.00:**
+
+![Rollback - State After Update](docs/rollback.jpg)
+
+**State after ROLLBACK — original values restored:**
+
+<!-- TODO: add image docs/rollback_after.jpg -->
+
+---
+
+### COMMIT Example — Permanently Extending Discount Validity
+
+> This transaction demonstrates the `COMMIT` mechanism. A bulk update extends all discount `valid_to` dates by 1 month. The transaction is then committed, making the changes permanent.
+```sql
+-- Step 1: View initial state
+SELECT discount_id, discount_name, percentage, valid_to FROM DISCOUNT;
+
+BEGIN;
+
+-- Step 2: Extend all discounts by 1 month
+UPDATE DISCOUNT
+SET valid_to = valid_to + INTERVAL '1 month'
+RETURNING *;
+
+-- Step 3: View state after update
+SELECT discount_id, discount_name, percentage, valid_to FROM DISCOUNT;
+
+-- Step 4: Confirm permanently
+COMMIT;
+
+-- Step 5: View state after commit (changes are permanent)
+SELECT discount_id, discount_name, percentage, valid_to FROM DISCOUNT;
+```
+
+**Initial state — before transaction:**
+
+![Commit - Initial State](docs/discount_before.jpg)
+
+**Final state — after COMMIT (valid_to extended by 1 month):**
+
+![Commit - After Commit](docs/commit_transactions.jpg)
+
+
+
 ## 🐳 Docker Setup (PostgreSQL)
 
 ### Prerequisites
