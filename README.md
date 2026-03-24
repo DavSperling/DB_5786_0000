@@ -21,6 +21,7 @@ This project is a restaurant order and billing database management system. It wa
 
 ## 📌 Table of Contents
 
+### 🔵 Stage 1
 1. [Overview](#overview)
 2. [Application Mockup (UI)](#application-mockup-ui)
 3. [ERD and DSD Diagrams](#erd-and-dsd-diagrams)
@@ -29,6 +30,15 @@ This project is a restaurant order and billing database management system. It wa
 6. [Backup & Restore](#backup--restore)
 7. [Docker Setup](#docker-setup-postgresql)
 8. [Getting Started](#getting-started-python-app)
+
+### 🟠 Stage 2
+9. [SELECT Queries — Dual Form (JOIN vs Subquery)](#-select-queries--dual-form-join-vs-subquery)
+10. [SELECT Queries — Additional](#-select-queries--additional)
+11. [UPDATE Queries](#-update-queries)
+12. [DELETE Queries](#-delete-queries)
+13. [Constraints (CHECK)](#-constraints-check)
+14. [Backup & Restore — Stage 2](#-stage-2--backup--restore-verification)
+15. [Transactions — ROLLBACK & COMMIT](#-transactions--rollback--commit)
 
 ---
 
