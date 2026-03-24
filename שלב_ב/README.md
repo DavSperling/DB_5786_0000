@@ -55,29 +55,29 @@ The system uses foreign keys, weak entities, and entity relationships to maintai
 The screenshots below represent a **UI mockup** of what the application layer could look like, designed to illustrate the real-world use case of the database.
 
 ### Login
-![Login Screen](login.jpeg)
+![Login Screen](../docs/login.jpeg)
 
 ### Dashboard
-![Dashboard](dashboard.jpeg)
+![Dashboard](../docs/dashboard.jpeg)
 
 ### Orders & Billing
-![Orders and Billing](order_and_bill.jpeg)
+![Orders and Billing](../docs/order_and_bill.jpeg)
 
 ### Menu Management
-![Menu Management](menu_management.jpeg)
+![Menu Management](../docs/menu_management.jpeg)
 
 ### Staff & Tables
-![Staff and Table Map](staff_table.jpeg)
+![Staff and Table Map](../docs/staff_table.jpeg)
 
 ---
 
 ## 📁 ERD and DSD Diagrams
 
 ### ERD
-![ER Diagram](ERD.png)
+![ER Diagram](../docs/ERD.png)
 
 ### DSD
-![Relational Schema](DSD.png)
+![Relational Schema](../docs/DSD.png)
 
 ---
 
@@ -136,20 +136,20 @@ Junction table linking bills to applied discounts.
 
 Data for the `BILL_DISCOUNT` junction table was generated using a custom Python script that produces 20,000 INSERT statements into a `.sql` file.
 
-![Python Script](python_script.jpeg)
+![Python Script](../docs/python_script.jpeg)
 
 ### ✅ Method B: Mockaroo Generator
 
 Tables such as `ORDER`,`PAYMENT`, and `DISCOUNT` were populated using [Mockaroo](https://mockaroo.com/), a tool that generates realistic mock data in SQL format.
 
-![Order Mockaroo](Order.jpg)
+![Order Mockaroo](../docs/Order.jpg)
 
 
 ### ✅ Method C: Mockaroo Generator CSV
 
 Tables `BILL` was populated using [Mockaroo](https://mockaroo.com/), a tool that generates realistic mock data in CSV format.
 
-![Bill Mockaroo](Bill.jpg)
+![Bill Mockaroo](../docs/Bill.jpg)
 
 ---
 
@@ -159,13 +159,13 @@ Tables `BILL` was populated using [Mockaroo](https://mockaroo.com/), a tool that
 
 A full backup of the `restaurant_db` database was performed using pgAdmin.
 
-![Backup](backup.jpeg)
+![Backup](../docs/backup.jpeg)
 
 ### Restore
 
 The backup was successfully restored into a test database to verify data integrity.
 
-![Restore](restore.jpeg)
+![Restore](../docs/restore.jpeg)
 
 ---
 
@@ -197,7 +197,7 @@ JOIN PAYMENT p ON b.bill_id = p.bill_id
 ORDER BY b.total_amount DESC;
 ```
 
-![Select 1A - JOIN](select_1a.jpg)
+![Select 1A - JOIN](../docs/select_1a.jpg)
 
 ---
 
@@ -213,7 +213,7 @@ FROM "ORDER" o
 ORDER BY total_amount DESC;
 ```
 
-![Select 1B - Subquery](select_1b.jpg)
+![Select 1B - Subquery](../docs/select_1b.jpg)
 
 ---
 
@@ -237,7 +237,7 @@ JOIN DISCOUNT d ON bd.discount_id = d.discount_id
 ORDER BY amount_saved DESC;
 ```
 
-![Select 2A - JOIN](select_2a.jpg)
+![Select 2A - JOIN](../docs/select_2a.jpg)
 
 ---
 
@@ -255,7 +255,7 @@ AND bd.bill_id = b.bill_id AND bd.discount_id = d.discount_id
 ORDER BY amount_saved DESC;
 ```
 
-![Select 2B - Subquery](select2_b.jpg)
+![Select 2B - Subquery](../docs/select2_b.jpg)
 
 ---
 
@@ -281,7 +281,7 @@ GROUP BY o.waiter_id, EXTRACT(YEAR FROM o.order_time), EXTRACT(MONTH FROM o.orde
 ORDER BY year, month, total_orders DESC;
 ```
 
-![Select 3A - JOIN](select_3a.jpg)
+![Select 3A - JOIN](../docs/select_3a.jpg)
 
 ---
 
@@ -302,7 +302,7 @@ GROUP BY waiter_id, year, month
 ORDER BY year, month, total_orders DESC;
 ```
 
-![Select 3B - Subquery](select_3b.jpg)
+![Select 3B - Subquery](../docs/select_3b.jpg)
 
 ---
 
@@ -328,7 +328,7 @@ GROUP BY p.payment_method, EXTRACT(YEAR FROM p.payment_time), EXTRACT(MONTH FROM
 ORDER BY year, month, usage_count DESC;
 ```
 
-![Select 4A - JOIN](select_4a.jpg)
+![Select 4A - JOIN](../docs/select_4a.jpg)
 
 ---
 
@@ -348,7 +348,7 @@ GROUP BY payment_method, year, month
 ORDER BY year, month, usage_count DESC;
 ```
 
-![Select 4B - Subquery](select_4b.jpg)
+![Select 4B - Subquery](../docs/select_4b.jpg)
 
 ---
 
@@ -375,7 +375,7 @@ WHERE oi.special_request IS NOT NULL
 ORDER BY o.order_time DESC;
 ```
 
-![Select 5 - Special Requests](select_5.jpg)
+![Select 5 - Special Requests](../docs/select_5.jpg)
 
 ---
 
@@ -396,7 +396,7 @@ GROUP BY EXTRACT(YEAR FROM b.bill_time),
 ORDER BY year DESC, month DESC, day DESC;
 ```
 
-![Select 6 - Daily Revenue](select_6.jpg)
+![Select 6 - Daily Revenue](../docs/select_6.jpg)
 
 ---
 
@@ -414,7 +414,7 @@ WHERE o.order_status = 'Cancelled'
 ORDER BY o.order_time DESC;
 ```
 
-![Select 7 - Cancelled Orders](select_7.jpg)
+![Select 7 - Cancelled Orders](../docs/select_7.jpg)
 
 ---
 
@@ -429,7 +429,7 @@ FROM DISCOUNT d
 ORDER BY d.percentage DESC;
 ```
 
-![Select 8 - Discounts by Percentage](select_8.jpg)
+![Select 8 - Discounts by Percentage](../docs/select_8.jpg)
 
 ---
 
@@ -452,11 +452,11 @@ RETURNING *;
 
 **Before:**
 
-![Order Table Before Update 1](order_before.jpg)
+![Order Table Before Update 1](../docs/order_before.jpg)
 
 **After:**
 
-![Update 1 - Result](update_1.jpg)
+![Update 1 - Result](../docs/update_1.jpg)
 
 ---
 
@@ -471,11 +471,11 @@ RETURNING *;
 
 **Before:**
 
-![Order Table Before Update 2](order_before.jpg)
+![Order Table Before Update 2](../docs/order_before.jpg)
 
 **After (RETURNING \*):**
 
-![Update 2 - Result](update_2.jpg)
+![Update 2 - Result](../docs/update_2.jpg)
 
 ---
 
@@ -490,11 +490,11 @@ RETURNING *;
 
 **Before:**
 
-![Discount Table Before Update 3](discount_before.jpg)
+![Discount Table Before Update 3](../docs/discount_before.jpg)
 
 **After (RETURNING \*):**
 
-![Update 3 - Result](update_3.jpg)
+![Update 3 - Result](../docs/update_3.jpg)
 
 ---
 
@@ -514,11 +514,11 @@ WHERE amount < 5;
 
 **Before:**
 
-![Payment Table Before Delete](payement_before.jpg)
+![Payment Table Before Delete](../docs/payement_before.jpg)
 
 **After:**
 
-![Delete 1 - After (PAYMENT table cleaned)](delete_1.jpg)
+![Delete 1 - After (PAYMENT table cleaned)](../docs/delete_1.jpg)
 
 ---
 
@@ -532,11 +532,11 @@ WHERE valid_to < CURRENT_DATE - INTERVAL '1 year';
 
 **Before:**
 
-![Discount Table Before Delete](discount_before.jpg)
+![Discount Table Before Delete](../docs/discount_before.jpg)
 
 **After:**
 
-![Delete 2 - After (expired discounts removed)](delete_2.jpg)
+![Delete 2 - After (expired discounts removed)](../docs/delete_2.jpg)
 
 ---
 
@@ -551,11 +551,11 @@ WHERE order_status = 'Cancelled'
 
 **Before:**
 
-![Order Table Before Delete](order_before.jpg)
+![Order Table Before Delete](../docs/order_before.jpg)
 
 **After:**
 
-![Delete 3 - After (orphaned cancelled orders removed)](delete_3.jpg)
+![Delete 3 - After (orphaned cancelled orders removed)](../docs/delete_3.jpg)
 
 ---
 
@@ -578,7 +578,7 @@ INSERT INTO BILL (bill_id, order_id, total_amount, tax, discount_amount, final_a
 VALUES (999, 1, 50.00, -5.00, 0, 45.00, CURRENT_TIMESTAMP);
 ```
 
-![Constraint 1 - Check Tax Error](constraint_1.jpg)
+![Constraint 1 - Check Tax Error](../docs/constraint_1.jpg)
 
 > ❌ The database correctly rejects the insertion with: `ERROR: new row for relation "bill" violates check constraint "check_tax"`
 
@@ -597,7 +597,7 @@ INSERT INTO PAYMENT (payment_id, bill_id, payment_method, payment_time, amount)
 VALUES (999, 1, 'Cash', CURRENT_TIMESTAMP, 0);
 ```
 
-![Constraint 2 - Check Payment Amount Error](constraint_2.jpg)
+![Constraint 2 - Check Payment Amount Error](../docs/constraint_2.jpg)
 
 > ❌ The database correctly rejects the insertion with: `ERROR: new row for relation "payment" violates check constraint "check_payment_amount"`
 
@@ -616,7 +616,7 @@ INSERT INTO DISCOUNT (discount_id, discount_name, percentage, valid_from, valid_
 VALUES (999, 'Super Promo', 150.00, '2025-01-01', '2025-12-31');
 ```
 
-![Constraint 3 - Check Percentage Error](constraint_3.jpg)
+![Constraint 3 - Check Percentage Error](../docs/constraint_3.jpg)
 
 > ❌ The database correctly rejects the insertion with: `ERROR: new row for relation "discount" violates check constraint "check_percentage"`
 
@@ -628,7 +628,7 @@ A new backup of the `restaurant_db` database was performed after all Stage 2 ope
 
 The pgAdmin job history confirms both the **Backup** and **Restore** operations completed successfully.
 
-![Backup & Restore History - Stage 2](backup_2.jpg)
+![Backup & Restore History - Stage 2](../docs/backup_2.jpg)
 
 ---
 
@@ -662,11 +662,11 @@ SELECT bill_id, total_amount, tax, discount_amount FROM BILL;
 
 **State after UPDATE (before ROLLBACK) — all discount_amount = 10.00:**
 
-![Rollback - State After Update](rollback.jpg)
+![Rollback - State After Update](../docs/rollback.jpg)
 
 **State after ROLLBACK — original values restored:**
 
-![State after ROLLBACK - original values restored](discount_before.jpg)
+![State after ROLLBACK - original values restored](../docs/discount_before.jpg)
 
 ---
 
@@ -696,11 +696,11 @@ SELECT discount_id, discount_name, percentage, valid_to FROM DISCOUNT;
 
 **Initial state — before transaction:**
 
-![Commit - Initial State](discount_before.jpg)
+![Commit - Initial State](../docs/discount_before.jpg)
 
 **Final state — after COMMIT (valid_to extended by 1 month):**
 
-![Commit - After Commit](commit_transactions.jpg)
+![Commit - After Commit](../docs/commit_transactions.jpg)
 
 
 
