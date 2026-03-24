@@ -187,6 +187,9 @@ Both return the same result, but differ in readability and execution efficiency.
 
 > Retrieves each order along with its total bill amount, tax, and payment method, ordered by total amount descending.
 
+**🎯 Business Context:** A restaurant manager wants to review all orders with their financial details and payment method in a single view — useful for end-of-day reconciliation and detecting unpaid or high-value orders.
+
+
 **Version A — Using JOIN**
 ```sql
 SELECT o.order_id, o.order_status, o.order_time,
@@ -225,6 +228,8 @@ ORDER BY total_amount DESC;
 ### Query 2 — Bills with Applied Discounts & Savings
 
 > Retrieves each bill along with the applied discount name, percentage, and the actual amount saved, ordered by savings descending.
+
+**🎯 Business Context:** The accounting team needs to track how much revenue is lost to discounts and which promotions are most costly — essential for evaluating the profitability of discount campaigns.
 
 **Version A — Using JOIN**
 ```sql
@@ -267,6 +272,8 @@ ORDER BY amount_saved DESC;
 ### Query 3 — Waiter Performance by Month
 
 > Retrieves each waiter's total number of orders and total revenue generated, grouped by month and year.
+
+**🎯 Business Context:** The restaurant owner wants to evaluate each waiter's productivity and revenue contribution per month — useful for performance reviews, bonuses, and scheduling decisions.
 
 **Version A — Using JOIN**
 ```sql
@@ -314,6 +321,8 @@ ORDER BY year, month, total_orders DESC;
 ### Query 4 — Payment Method Statistics by Month
 
 > Retrieves payment method usage count and total amount paid, grouped by method, year, and month.
+
+**🎯 Business Context:** The finance team wants to understand customer payment preferences over time — useful for deciding whether to invest in new payment terminals or negotiate lower card processing fees.
 
 **Version A — Using JOIN**
 ```sql
@@ -366,6 +375,9 @@ The following 4 queries each demonstrate a specific analytical use case for the 
 ### Query 5 — Orders Containing Special Requests
 
 > Retrieves all order items that include a special request (e.g., "No salt", "Gluten free"), joined with their parent order details, sorted by most recent order.
+
+**🎯 Business Context:** The kitchen manager needs to monitor special dietary requests (allergies, preferences) to ensure staff are prepared and no requests are missed during service.
+
 ```sql
 SELECT o.order_id, o.order_time, o.order_status,
        oi.menu_item_id, oi.quantity, oi.special_request
@@ -382,6 +394,9 @@ ORDER BY o.order_time DESC;
 ### Query 6 — Daily Revenue Report
 
 > Aggregates the number of bills, total revenue, and total tax collected per day, sorted from most recent to oldest.
+
+**🎯 Business Context:** Management needs a daily summary of revenue and tax collected to track business performance over time and compare busy vs slow days.
+
 ```sql
 SELECT EXTRACT(DAY FROM b.bill_time) AS day,
        EXTRACT(MONTH FROM b.bill_time) AS month,
@@ -403,6 +418,9 @@ ORDER BY year DESC, month DESC, day DESC;
 ### Query 7 — Cancelled Orders with Their Items
 
 > Retrieves all order items belonging to cancelled orders, including the waiter, menu item, quantity, and date, sorted by most recent.
+
+**🎯 Business Context:** Operations needs to investigate cancelled orders to identify patterns — for example, a specific waiter or time slot with high cancellation rates that may indicate a service problem.
+
 ```sql
 SELECT o.order_id, o.order_time, o.waiter_id,
        oi.menu_item_id, oi.quantity,
@@ -421,6 +439,9 @@ ORDER BY o.order_time DESC;
 ### Query 8 — Discounts Ranked by Percentage with Duration
 
 > Lists all discounts sorted by percentage descending, with a computed column showing the number of days each discount is valid.
+
+**🎯 Business Context:** The marketing team wants to review all active and past discounts ranked by their value — useful for auditing promotions and identifying overly generous discounts that hurt margins.
+
 ```sql
 SELECT d.discount_id, d.discount_name, d.percentage,
        d.valid_from, d.valid_to,
