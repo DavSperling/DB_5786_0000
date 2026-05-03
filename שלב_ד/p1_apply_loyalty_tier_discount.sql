@@ -1,41 +1,40 @@
 -- ============================================================
--- שלב ד - PROCÉDURE 1
--- Nom        : apply_loyalty_tier_discount
+-- Stage 4 - PROCEDURE 1
+-- Name       : apply_loyalty_tier_discount
 -- Type       : PROCEDURE
--- But        : Pour tous les clients d'un tier donné, applique
---              une remise supplémentaire (en %) à TOUTES leurs
---              factures dont la commande est encore 'In Progress'.
---              La remise est plafonnée selon le tier (CASE) :
+-- Purpose    : For every customer of a given loyalty tier,
+--              applies an extra discount (in %) to ALL their
+--              bills whose order is still 'In Progress'.
+--              The discount is capped per tier (CASE):
 --                 Bronze   -> max 10%
 --                 Silver   -> max 15%
 --                 Gold     -> max 20%
 --                 Platinum -> max 30%
---              Pour chaque facture mise à jour, on insère AUSSI
---              une transaction de fidélité dans loyalty_transaction
---              (= 2 instructions DML, requirement DML respecté).
---              Toutes les modifs sont faites dans une boucle qui
---              parcourt EXPLICITEMENT un curseur (DECLARE/OPEN).
+--              For every updated bill, we also INSERT a loyalty
+--              transaction (= 2 DML statements, satisfies the
+--              DML requirement). Updates are performed inside a
+--              loop walking an EXPLICIT cursor (DECLARE/OPEN).
 --
--- Éléments PL/pgSQL utilisés :
---   • Curseur EXPLICITE                              ✔
---   • Record (FETCH INTO)                            ✔
---   • Boucle LOOP                                    ✔
---   • Branchement CASE + IF                          ✔
---   • DML : UPDATE bill (2 colonnes)                 ✔
---   • DML : INSERT INTO loyalty_transaction          ✔
---   • Exception (raise_exception, OTHERS)            ✔
+-- PL/pgSQL elements used:
+--   * EXPLICIT cursor                                [x]
+--   * Record (FETCH INTO)                            [x]
+--   * Loop LOOP                                      [x]
+--   * Branching CASE + IF                            [x]
+--   * DML: UPDATE bill (2 columns)                   [x]
+--   * DML: INSERT INTO loyalty_transaction           [x]
+--   * Exception (raise_exception, OTHERS)            [x]
 -- ============================================================
 
 DROP PROCEDURE IF EXISTS apply_loyalty_tier_discount(VARCHAR, NUMERIC);
 
 CREATE OR REPLACE PROCEDURE apply_loyalty_tier_discount(
     p_tier      VARCHAR,
-    p_extra_pct NUMERIC          -- exprimé en pourcentage, ex 5 pour 5%
+    p_extra_pct NUMERIC          -- expressed as a percentage, e.g. 5 for 5%
 )
 LANGUAGE plpgsql
 AS $$
 DECLARE
-    -- ---- Curseur explicite : factures éligibles + tier client ----
+    -- ---- Explicit cursor: eligible bills + customer tier ----
     cur_eligible CURSOR (tier_filter VARCHAR) FOR
         SELECT b.bill_id,
                b.total_amount,
@@ -62,19 +61,19 @@ DECLARE
     v_count           INT := 0;
     v_default_reason  INT;
 BEGIN
-    -- ---------- 1. Validation des entrées ----------
+    -- ---------- 1. Input validation ----------
     IF p_tier NOT IN ('Bronze','Silver','Gold','Platinum') THEN
-        RAISE EXCEPTION 'Tier invalide "%".', p_tier
+        RAISE EXCEPTION 'Invalid tier "%".', p_tier
             USING ERRCODE = '22023';
     END IF;
 
     IF p_extra_pct IS NULL OR p_extra_pct < 0 OR p_extra_pct > 100 THEN
-        RAISE EXCEPTION 'Pourcentage invalide (reçu : %). Attendu entre 0 et 100.',
+        RAISE EXCEPTION 'Invalid percentage (got: %). Expected between 0 and 100.',
                         p_extra_pct
             USING ERRCODE = '22023';
     END IF;
 
-    -- ---------- 2. Plafond par tier (CASE) ----------
+    -- ---------- 2. Per-tier cap (CASE) ----------
     v_max_pct := CASE p_tier
                      WHEN 'Bronze'   THEN 10
                      WHEN 'Silver'   THEN 15
@@ -85,11 +84,11 @@ BEGIN
     v_applied_pct := LEAST(p_extra_pct, v_max_pct);
 
     IF v_applied_pct < p_extra_pct THEN
-        RAISE NOTICE 'Pourcentage demandé (%) plafonné à % pour le tier %.',
+        RAISE NOTICE 'Requested percentage (%) capped at % for tier %.',
                      p_extra_pct, v_applied_pct, p_tier;
     END IF;
 
-    -- ---------- 3. Trouver une raison existante pour les transactions de fidélité ----------
+    -- ---------- 3. Pick an existing reason for the loyalty transactions ----------
     SELECT reason_id
       INTO v_default_reason
       FROM reason
@@ -97,28 +96,28 @@ BEGIN
      LIMIT 1;
 
     IF v_default_reason IS NULL THEN
-        RAISE EXCEPTION 'Aucune entrée dans la table "reason" : impossible d''insérer dans loyalty_transaction.'
+        RAISE EXCEPTION 'No row in table "reason": cannot insert into loyalty_transaction.'
             USING ERRCODE = 'P0002';
     END IF;
 
-    -- ---------- 4. Boucle sur le curseur explicite ----------
+    -- ---------- 4. Walk the explicit cursor ----------
     OPEN cur_eligible(p_tier);
     LOOP
         FETCH cur_eligible INTO rec;
         EXIT WHEN NOT FOUND;
 
-        -- Calculs
+        -- Computations
         v_extra_amount := ROUND(rec.total_amount * v_applied_pct / 100, 2);
         v_new_discount := COALESCE(rec.discount_amount, 0) + v_extra_amount;
         v_new_final    := GREATEST(rec.total_amount - v_new_discount, 0);
 
-        -- DML #1 : UPDATE bill
+        -- DML #1: UPDATE bill
         UPDATE bill
            SET discount_amount = v_new_discount,
                final_amount    = v_new_final
          WHERE bill_id = rec.bill_id;
 
-        -- DML #2 : INSERT loyalty_transaction (1 point fidélité offert pour chaque euro de remise)
+        -- DML #2: INSERT loyalty_transaction (1 loyalty point per euro of discount)
         INSERT INTO loyalty_transaction (
             transaction_id, points_change, created_at, loyalty_id, reason_id
         )
@@ -134,15 +133,15 @@ BEGIN
     END LOOP;
     CLOSE cur_eligible;
 
-    RAISE NOTICE 'apply_loyalty_tier_discount : tier=%, pct_applique=%, factures_mises_a_jour=%',
+    RAISE NOTICE 'apply_loyalty_tier_discount: tier=%, applied_pct=%, bills_updated=%',
                  p_tier, v_applied_pct, v_count;
 
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'apply_loyalty_tier_discount : ERREUR % - %', SQLSTATE, SQLERRM;
+        RAISE NOTICE 'apply_loyalty_tier_discount: ERROR % - %', SQLSTATE, SQLERRM;
         RAISE;
 END;
 $$;
 
 COMMENT ON PROCEDURE apply_loyalty_tier_discount(VARCHAR, NUMERIC)
-IS 'P1 - Applique une remise supplémentaire (plafonnée par tier) aux factures en cours des clients du tier indiqué, et crédite des points fidélité associés.';
+IS 'P1 - Applies an extra discount (capped per tier) to the in-progress bills of customers of the given tier, and credits matching loyalty points.';

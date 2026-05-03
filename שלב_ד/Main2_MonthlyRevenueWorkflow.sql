@@ -1,22 +1,20 @@
 -- ============================================================
--- שלב ד - PROGRAMME PRINCIPAL 2
--- Nom        : Main2_MonthlyRevenueWorkflow.sql
--- Scénario   : En fin de mois, le manager veut un rapport
---              global :
---                1. revenu total de la période (F2)
---                2. détail par serveur, persisté en base (P2)
--- Démontre   :
---   • Appel d'une FONCTION renvoyant un scalaire.
---   • Appel d'une PROCÉDURE qui fait des DML (DELETE + INSERT).
---   • Vérification du contenu de MONTHLY_WAITER_REPORT
---     avant / après.
---   • Démonstration d'EXCEPTION (période vide).
+-- Stage 4 - MAIN PROGRAM 2
+-- Name       : Main2_MonthlyRevenueWorkflow.sql
+-- Scenario   : At month-end, the manager wants a global report:
+--                1. total revenue for the period (F2)
+--                2. per-waiter detail, persisted (P2)
+-- Showcases  :
+--   * Calling a FUNCTION returning a scalar.
+--   * Calling a PROCEDURE that performs DML (DELETE + INSERT).
+--   * BEFORE / AFTER state of MONTHLY_WAITER_REPORT.
+--   * EXCEPTION demo (empty period).
 -- ============================================================
 
 -- =========================================================
--- 0. Détecter une période qui contient effectivement des données
+-- 0. Detect a period that actually contains data
 -- =========================================================
-\echo '======= Détection de la période la plus active ======='
+\echo '======= Detect the busiest period ======='
 WITH best_month AS (
     SELECT EXTRACT(YEAR  FROM o.order_time)::INT AS y,
            EXTRACT(MONTH FROM o.order_time)::INT AS m,
@@ -30,32 +28,32 @@ SELECT * FROM best_month;
 
 
 -- =========================================================
--- 1. État BEFORE de MONTHLY_WAITER_REPORT
+-- 1. BEFORE state of MONTHLY_WAITER_REPORT
 -- =========================================================
-\echo '======= BEFORE : contenu MONTHLY_WAITER_REPORT ======='
+\echo '======= BEFORE: MONTHLY_WAITER_REPORT contents ======='
 SELECT COUNT(*) AS nb_rows_before FROM MONTHLY_WAITER_REPORT;
 
 
 -- =========================================================
--- 2. Appel de la FONCTION F2 (scalar)
---    Sur l'année 2024 entière (notre dataset principal).
+-- 2. Call FUNCTION F2 (scalar)
+--    Full year 2024 (our main dataset).
 -- =========================================================
-\echo '======= APPEL F2 : calculate_period_revenue(2024-01-01, 2024-12-31) ======='
+\echo '======= CALL F2: calculate_period_revenue(2024-01-01, 2024-12-31) ======='
 SELECT calculate_period_revenue(DATE '2024-01-01', DATE '2024-12-31') AS revenue_2024;
 
 
 -- =========================================================
--- 3. Appel de la PROCÉDURE P2
---    On génère le rapport pour avril 2024 (mois bien rempli).
+-- 3. Call PROCEDURE P2
+--    Generate the report for April 2024 (busiest month).
 -- =========================================================
-\echo '======= APPEL P2 : generate_monthly_waiter_report(2024, 4) ======='
+\echo '======= CALL P2: generate_monthly_waiter_report(2024, 4) ======='
 CALL generate_monthly_waiter_report(2024, 4);
 
 
 -- =========================================================
--- 4. État AFTER de MONTHLY_WAITER_REPORT
+-- 4. AFTER state of MONTHLY_WAITER_REPORT
 -- =========================================================
-\echo '======= AFTER : contenu MONTHLY_WAITER_REPORT (top 10) ======='
+\echo '======= AFTER: MONTHLY_WAITER_REPORT contents (top 10) ======='
 SELECT report_year, report_month, waiter_id, nb_orders,
        total_revenue, avg_bill, perf_level, generated_at
   FROM MONTHLY_WAITER_REPORT
@@ -63,7 +61,7 @@ SELECT report_year, report_month, waiter_id, nb_orders,
  ORDER BY total_revenue DESC
  LIMIT 10;
 
-\echo '======= Distribution par perf_level ======='
+\echo '======= Distribution by perf_level ======='
 SELECT perf_level, COUNT(*) AS nb_waiters,
        ROUND(AVG(total_revenue),2) AS avg_revenue
   FROM MONTHLY_WAITER_REPORT
@@ -74,30 +72,30 @@ SELECT perf_level, COUNT(*) AS nb_waiters,
 
 
 -- =========================================================
--- 5. Démo EXCEPTION : F2 sur une période vide
+-- 5. EXCEPTION DEMO: F2 on an empty period
 -- =========================================================
-\echo '======= DÉMO EXCEPTION : période sans données ======='
+\echo '======= EXCEPTION DEMO: empty period ======='
 DO $$
 DECLARE v_rev NUMERIC;
 BEGIN
     v_rev := calculate_period_revenue(DATE '1990-01-01', DATE '1990-12-31');
-    RAISE NOTICE 'Revenu : %', v_rev;
+    RAISE NOTICE 'Revenue: %', v_rev;
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'Exception attrapée comme prévu : %', SQLERRM;
+        RAISE NOTICE 'Exception caught as expected: %', SQLERRM;
 END;
 $$;
 
 
 -- =========================================================
--- 6. Démo EXCEPTION : P2 sur un mois sans données
+-- 6. EXCEPTION DEMO: P2 on a month without orders
 -- =========================================================
-\echo '======= DÉMO EXCEPTION : mois sans commandes ======='
+\echo '======= EXCEPTION DEMO: month with no orders ======='
 DO $$
 BEGIN
     CALL generate_monthly_waiter_report(1999, 1);
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'Exception attrapée comme prévu : %', SQLERRM;
+        RAISE NOTICE 'Exception caught as expected: %', SQLERRM;
 END;
 $$;

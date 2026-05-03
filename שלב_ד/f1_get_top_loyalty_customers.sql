@@ -1,20 +1,20 @@
 -- ============================================================
--- שלב ד - FONCTION 1
--- Nom        : get_top_loyalty_customers
--- Type       : FUNCTION (retourne un REF CURSOR)
--- But        : Pour un tier de fidélité donné (Bronze/Silver/
---              Gold/Platinum) et un nombre minimal de commandes,
---              renvoie un curseur contenant les clients qui
---              correspondent, classés par revenu décroissant,
---              avec une catégorie de récompense calculée.
+-- Stage 4 - FUNCTION 1
+-- Name       : get_top_loyalty_customers
+-- Type       : FUNCTION (returns a REF CURSOR)
+-- Purpose    : For a given loyalty tier (Bronze/Silver/Gold/
+--              Platinum) and a minimum order count, returns
+--              a cursor over the matching customers, ordered
+--              by revenue descending, with a derived reward
+--              category.
 --
--- Éléments PL/pgSQL utilisés :
---   • RETURN refcursor                              ✔
---   • Curseur EXPLICITE (FOR rec IN cur LOOP)       ✔
---   • Record (%ROWTYPE-like via RECORD)             ✔
---   • Branchement IF / CASE                         ✔
---   • Boucle                                        ✔
---   • Exception (NO_DATA_FOUND, OTHERS, custom)     ✔
+-- PL/pgSQL elements used:
+--   * RETURN refcursor                              [x]
+--   * EXPLICIT cursor (FOR rec IN cur LOOP)         [x]
+--   * Record (RECORD)                               [x]
+--   * Branching IF / CASE                           [x]
+--   * Loop                                          [x]
+--   * Exception (NO_DATA_FOUND, OTHERS, custom)     [x]
 -- ============================================================
 
 DROP FUNCTION IF EXISTS get_top_loyalty_customers(VARCHAR, INT, REFCURSOR);
@@ -29,21 +29,21 @@ AS $$
 DECLARE
     v_count INT;
 BEGIN
-    -- ---------- 1. Validation des arguments ----------
+    -- ---------- 1. Argument validation ----------
     IF p_tier NOT IN ('Bronze','Silver','Gold','Platinum') THEN
         RAISE EXCEPTION
-            'Tier invalide "%". Valeurs autorisées : Bronze, Silver, Gold, Platinum.',
+            'Invalid tier "%". Allowed values: Bronze, Silver, Gold, Platinum.',
             p_tier
             USING ERRCODE = '22023';
     END IF;
 
     IF p_min_orders < 0 THEN
-        RAISE EXCEPTION 'Le nombre minimal de commandes doit être >= 0 (reçu : %).',
+        RAISE EXCEPTION 'Minimum order count must be >= 0 (got: %).',
             p_min_orders
             USING ERRCODE = '22023';
     END IF;
 
-    -- ---------- 2. Vérifier qu'il existe au moins un client matching ----------
+    -- ---------- 2. Make sure at least one customer matches ----------
     SELECT COUNT(*)
       INTO v_count
       FROM customer            c
@@ -52,12 +52,12 @@ BEGIN
       WHERE lt.level = p_tier;
 
     IF v_count = 0 THEN
-        RAISE EXCEPTION 'Aucun client trouvé pour le tier "%".', p_tier
-            USING ERRCODE = 'P0002';   -- équivalent NO_DATA_FOUND
+        RAISE EXCEPTION 'No customer found for tier "%".', p_tier
+            USING ERRCODE = 'P0002';   -- equivalent to NO_DATA_FOUND
     END IF;
 
-    -- ---------- 3. Ouvrir le REF CURSOR ----------
-    -- Sélection enrichie d'une catégorie de récompense calculée par CASE.
+    -- ---------- 3. Open the REF CURSOR ----------
+    -- The SELECT enriches each row with a reward category derived via CASE.
     OPEN p_cursor FOR
         SELECT
             c.customer_id,
@@ -82,18 +82,18 @@ BEGIN
         HAVING     COUNT(DISTINCT o.order_id) >= p_min_orders
         ORDER BY   total_revenue DESC, l.points DESC;
 
-    RAISE NOTICE 'Curseur "%" ouvert : tier=% / min_orders=% / clients_dispo=%',
+    RAISE NOTICE 'Cursor "%" opened: tier=% / min_orders=% / matching_customers=%',
                  p_cursor, p_tier, p_min_orders, v_count;
 
     RETURN p_cursor;
 
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'get_top_loyalty_customers : ERREUR % - %',
+        RAISE NOTICE 'get_top_loyalty_customers: ERROR % - %',
             SQLSTATE, SQLERRM;
-        RAISE;       -- on relance pour signaler l'échec à l'appelant
+        RAISE;       -- re-raise to signal the failure to the caller
 END;
 $$;
 
 COMMENT ON FUNCTION get_top_loyalty_customers(VARCHAR, INT, REFCURSOR)
-IS 'F1 - Retourne un REF CURSOR sur les meilleurs clients d''un tier de fidélité, classés par revenu, avec une catégorie de récompense calculée.';
+IS 'F1 - Returns a REF CURSOR over the top customers of a given loyalty tier, ordered by revenue, with a derived reward category.';

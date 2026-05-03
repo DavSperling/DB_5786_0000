@@ -1,20 +1,20 @@
 -- ============================================================
--- שלב ד - TRIGGER 1
--- Nom        : trg_validate_payment_amount
--- Quand      : BEFORE INSERT OR UPDATE on PAYMENT
--- But        : Empêche d'enregistrer un paiement dont le montant
---              dépasse strictement le final_amount de la facture
---              associée (lutte contre les erreurs de saisie).
---              Si on paie pile la facture -> OK.
---              Si NEW.amount > BILL.final_amount -> exception.
---              Met également la date de paiement à CURRENT_TIMESTAMP
---              quand elle est NULL (cohérence des données).
+-- Stage 4 - TRIGGER 1
+-- Name       : trg_validate_payment_amount
+-- Fires      : BEFORE INSERT OR UPDATE on PAYMENT
+-- Purpose    : Prevents recording a payment whose amount is
+--              strictly greater than the final_amount of the
+--              associated bill (guards against data-entry
+--              errors). A payment that exactly matches the
+--              bill is allowed. If NEW.amount > BILL.final_amount
+--              an exception is raised. Also fills payment_time
+--              with CURRENT_TIMESTAMP when it is NULL.
 --
--- Éléments PL/pgSQL utilisés :
---   • Curseur implicite via SELECT INTO              ✔
---   • Record                                         ✔
---   • Branchement IF                                 ✔
---   • Exception (custom + NO_DATA_FOUND)             ✔
+-- PL/pgSQL elements used:
+--   * Implicit cursor via SELECT INTO              [x]
+--   * Record                                       [x]
+--   * Branching IF                                 [x]
+--   * Exception (custom + NO_DATA_FOUND)           [x]
 -- ============================================================
 
 DROP TRIGGER  IF EXISTS trg_validate_payment_amount ON PAYMENT;
@@ -27,7 +27,7 @@ AS $$
 DECLARE
     v_bill_total NUMERIC(10,2);
 BEGIN
-    -- Curseur implicite : SELECT ... INTO
+    -- Implicit cursor: SELECT ... INTO
     SELECT b.final_amount
       INTO v_bill_total
       FROM bill b
@@ -35,20 +35,20 @@ BEGIN
 
     IF NOT FOUND THEN
         RAISE EXCEPTION
-            'Trigger T1 : la facture % référencée par le paiement n''existe pas.',
+            'Trigger T1: bill % referenced by the payment does not exist.',
             NEW.bill_id
             USING ERRCODE = 'P0002';
     END IF;
 
-    -- Branche : montant > total facture -> rejet
+    -- Branch: payment amount > bill total -> reject
     IF NEW.amount > v_bill_total THEN
         RAISE EXCEPTION
-            'Trigger T1 : paiement % > montant facture % (bill_id=%).',
+            'Trigger T1: payment % > bill amount % (bill_id=%).',
             NEW.amount, v_bill_total, NEW.bill_id
             USING ERRCODE = '23514';     -- check_violation
     END IF;
 
-    -- Cohérence : si payment_time est NULL, on le fixe à maintenant
+    -- Consistency: if payment_time is NULL, set it to now
     IF NEW.payment_time IS NULL THEN
         NEW.payment_time := CURRENT_TIMESTAMP;
     END IF;
@@ -63,4 +63,4 @@ FOR EACH ROW
 EXECUTE FUNCTION fn_validate_payment_amount();
 
 COMMENT ON FUNCTION fn_validate_payment_amount()
-IS 'T1 - Empêche l''enregistrement d''un paiement supérieur au final_amount de la facture associée, et complète payment_time si NULL.';
+IS 'T1 - Prevents recording a payment that exceeds the final_amount of the associated bill, and fills payment_time when NULL.';

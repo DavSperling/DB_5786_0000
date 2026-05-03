@@ -1,23 +1,23 @@
 -- ============================================================
--- שלב ד - PROCÉDURE 2
--- Nom        : generate_monthly_waiter_report
+-- Stage 4 - PROCEDURE 2
+-- Name       : generate_monthly_waiter_report
 -- Type       : PROCEDURE
--- But        : Génère (ou régénère) le rapport mensuel par
---              serveur et l'enregistre dans la table
---              MONTHLY_WAITER_REPORT (créée via AlterTable.sql).
---              On classe chaque serveur en HIGH / MEDIUM / LOW
---              suivant son revenu sur le mois.
---              Démontre le curseur IMPLICITE via FOR ... IN
---              (record loop sans déclaration explicite).
+-- Purpose    : Generates (or regenerates) a monthly per-waiter
+--              report and stores it in MONTHLY_WAITER_REPORT
+--              (created via AlterTable.sql).
+--              Each waiter is classified as HIGH / MEDIUM / LOW
+--              depending on their monthly revenue.
+--              Showcases the IMPLICIT cursor through FOR ... IN
+--              (record loop without an explicit declaration).
 --
--- Éléments PL/pgSQL utilisés :
---   • Curseur IMPLICITE (FOR rec IN <query>)                ✔
---   • Record                                                 ✔
---   • Boucle FOR                                             ✔
---   • Branchement IF / ELSIF                                 ✔
---   • DML : DELETE existant + INSERT (UPSERT logique)        ✔
---   • Exceptions (raise_exception, OTHERS)                   ✔
---   • RAISE NOTICE pour preuve d'exécution                   ✔
+-- PL/pgSQL elements used:
+--   * IMPLICIT cursor (FOR rec IN <query>)                  [x]
+--   * Record                                                [x]
+--   * FOR loop                                              [x]
+--   * Branching IF / ELSIF                                  [x]
+--   * DML: DELETE existing rows + INSERT (logical UPSERT)   [x]
+--   * Exceptions (raise_exception, OTHERS)                  [x]
+--   * RAISE NOTICE for execution proof                      [x]
 -- ============================================================
 
 DROP PROCEDURE IF EXISTS generate_monthly_waiter_report(INT, INT);
@@ -35,23 +35,23 @@ DECLARE
     v_perf            VARCHAR(10);
     v_inserted        INT           := 0;
 BEGIN
-    -- ---------- 1. Validation des paramètres ----------
+    -- ---------- 1. Parameter validation ----------
     IF p_year IS NULL OR p_month IS NULL THEN
-        RAISE EXCEPTION 'Année et mois ne peuvent pas être NULL.'
+        RAISE EXCEPTION 'Year and month cannot be NULL.'
             USING ERRCODE = '22023';
     END IF;
 
     IF p_month < 1 OR p_month > 12 THEN
-        RAISE EXCEPTION 'Mois invalide (reçu : %).', p_month
+        RAISE EXCEPTION 'Invalid month (got: %).', p_month
             USING ERRCODE = '22023';
     END IF;
 
-    -- ---------- 2. Purge des anciens enregistrements pour ce (year, month) ----------
+    -- ---------- 2. Purge previous rows for this (year, month) ----------
     DELETE FROM MONTHLY_WAITER_REPORT
      WHERE report_year  = p_year
        AND report_month = p_month;
 
-    -- ---------- 3. Curseur IMPLICITE : FOR rec IN <query> ----------
+    -- ---------- 3. IMPLICIT cursor: FOR rec IN <query> ----------
     FOR rec IN
         SELECT o.waiter_id,
                COUNT(DISTINCT o.order_id)              AS nb_orders,
@@ -64,7 +64,7 @@ BEGIN
          GROUP BY o.waiter_id
          ORDER BY total_revenue DESC
     LOOP
-        -- Branchement : niveau de performance
+        -- Branching: performance level
         IF rec.total_revenue >= 1500 THEN
             v_perf := 'HIGH';
         ELSIF rec.total_revenue >= 500 THEN
@@ -73,7 +73,7 @@ BEGIN
             v_perf := 'LOW';
         END IF;
 
-        -- DML : INSERT dans la table de rapport
+        -- DML: INSERT into the report table
         INSERT INTO MONTHLY_WAITER_REPORT(
             report_year, report_month, waiter_id,
             nb_orders, total_revenue, avg_bill, perf_level
@@ -92,22 +92,22 @@ BEGIN
             rec.waiter_id, rec.nb_orders, rec.total_revenue, v_perf;
     END LOOP;
 
-    -- ---------- 4. Vérification : si rien trouvé, lever exception ----------
+    -- ---------- 4. Sanity check: nothing found -> raise exception ----------
     IF v_inserted = 0 THEN
-        RAISE EXCEPTION 'Aucune commande trouvée pour %-%. Aucun rapport généré.',
+        RAISE EXCEPTION 'No order found for %-%. No report generated.',
                         p_year, p_month
             USING ERRCODE = 'P0002';
     END IF;
 
-    RAISE NOTICE '=== Rapport %-% terminé : % serveurs, % commandes, revenu total = % ===',
+    RAISE NOTICE '=== Report %-% done: % waiters, % orders, total revenue = % ===',
         p_year, p_month, v_inserted, v_total_orders, v_total_revenue;
 
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'generate_monthly_waiter_report : ERREUR % - %', SQLSTATE, SQLERRM;
+        RAISE NOTICE 'generate_monthly_waiter_report: ERROR % - %', SQLSTATE, SQLERRM;
         RAISE;
 END;
 $$;
 
 COMMENT ON PROCEDURE generate_monthly_waiter_report(INT, INT)
-IS 'P2 - Calcule et persiste les KPI mensuels par serveur dans MONTHLY_WAITER_REPORT, classifie chaque serveur (LOW/MEDIUM/HIGH).';
+IS 'P2 - Computes and persists monthly per-waiter KPIs into MONTHLY_WAITER_REPORT, classifying each waiter (LOW/MEDIUM/HIGH).';

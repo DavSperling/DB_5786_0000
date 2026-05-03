@@ -1,25 +1,24 @@
 -- ============================================================
--- שלב ג - VIEWS
--- 3 vues pour la base intégrée :
---   • View 1 : point de vue ORDERS & BILLING (votre département)
---   • View 2 : point de vue CUSTOMER / LOYALTY (département importé)
---   • View 3 : vue intégrée croisant les 2 départements
--- Chaque vue est suivie de 2 requêtes analytiques significatives.
+-- Stage 3 - VIEWS
+-- 3 views for the integrated database:
+--   * View 1: ORDERS & BILLING perspective (our department)
+--   * View 2: CUSTOMER / LOYALTY perspective (imported department)
+--   * View 3: integrated cross-department view
+-- Each view is followed by 2 meaningful analytical queries.
 -- ============================================================
 
--- Nettoyage idempotent (permet de relancer le script)
+-- Idempotent cleanup (allows replaying the script)
 DROP VIEW IF EXISTS Customer_Cross_Activity;
 DROP VIEW IF EXISTS Customer_Loyalty_Status;
 DROP VIEW IF EXISTS Customer_Order_Summary;
 
 
 -- =====================================================================
--- VIEW 1 (ORDERS & BILLING) : Customer_Order_Summary
+-- VIEW 1 (ORDERS & BILLING): Customer_Order_Summary
 -- ---------------------------------------------------------------------
--- Pour chaque client, agrège son activité commerciale :
--- nombre de commandes, total facturé, montant moyen par commande,
--- date de la dernière commande.
--- Combine 3 tables : customer + "ORDER" + bill.
+-- For each customer, aggregates their commercial activity:
+-- number of orders, total billed, average bill, last order timestamp.
+-- Combines 3 tables: customer + "ORDER" + bill.
 -- =====================================================================
 CREATE VIEW Customer_Order_Summary AS
 SELECT
@@ -35,13 +34,13 @@ LEFT JOIN  "ORDER" o ON c.customer_id = o.customer_id
 LEFT JOIN  bill    b ON o.order_id    = b.order_id
 GROUP BY   c.customer_id, c.first_name, c.last_name, c.email;
 
--- Aperçu de la vue (10 lignes max)
+-- View preview (first 10 rows)
 SELECT * FROM Customer_Order_Summary ORDER BY customer_id LIMIT 10;
 
 
--- ---- View 1 - Query 1 : Top 10 des clients par chiffre d'affaires ----
--- BUT : identifier les clients à plus forte valeur pour cibler des
---       programmes VIP ou des offres premium.
+-- ---- View 1 - Query 1: Top 10 customers by revenue ----
+-- PURPOSE: identify the highest-value customers to target VIP
+--          programs or premium offers.
 SELECT customer_name, total_orders, total_spent, last_order_time
 FROM   Customer_Order_Summary
 WHERE  total_orders > 0
@@ -49,9 +48,9 @@ ORDER BY total_spent DESC
 LIMIT 10;
 
 
--- ---- View 1 - Query 2 : Clients inactifs (jamais commandé) ----
--- BUT : repérer les clients qui ne sont jamais passés à l'achat malgré
---       leur inscription, pour des actions marketing ciblées.
+-- ---- View 1 - Query 2: Inactive customers (never ordered) ----
+-- PURPOSE: spot customers who registered but never converted to a
+--          purchase, for targeted marketing.
 SELECT customer_id, customer_name, email
 FROM   Customer_Order_Summary
 WHERE  total_orders = 0
@@ -60,12 +59,12 @@ LIMIT 10;
 
 
 -- =====================================================================
--- VIEW 2 (CUSTOMER / LOYALTY) : Customer_Loyalty_Status
+-- VIEW 2 (CUSTOMER / LOYALTY): Customer_Loyalty_Status
 -- ---------------------------------------------------------------------
--- Pour chaque client, donne son statut fidélité actuel :
--- tier (Bronze/Silver/Gold/Platinum), points, nombre de transactions
--- de fidélité et nombre de réservations passées.
--- Combine 4 tables : customer + loyalty + loyalty_tier + reservation.
+-- For each customer, exposes their current loyalty status:
+-- tier (Bronze/Silver/Gold/Platinum), points, number of loyalty
+-- transactions and number of past reservations.
+-- Combines 4 tables: customer + loyalty + loyalty_tier + reservation.
 -- =====================================================================
 CREATE VIEW Customer_Loyalty_Status AS
 SELECT
@@ -83,13 +82,13 @@ LEFT JOIN   loyalty_transaction lx ON l.loyalty_id  = lx.loyalty_id
 LEFT JOIN   reservation         r  ON c.customer_id = r.customer_id
 GROUP BY    c.customer_id, c.first_name, c.last_name, lt.level, l.points;
 
--- Aperçu de la vue (10 lignes)
+-- View preview (10 rows)
 SELECT * FROM Customer_Loyalty_Status ORDER BY customer_id LIMIT 10;
 
 
--- ---- View 2 - Query 1 : Distribution des clients par tier de fidélité ----
--- BUT : voir si le programme de fidélité atteint sa cible
---       (ex. trop de Bronze ? pas assez de Platinum ?).
+-- ---- View 2 - Query 1: Distribution of customers by loyalty tier ----
+-- PURPOSE: verify the balance of the loyalty program
+--          (e.g. too many Bronze? not enough Platinum?).
 SELECT tier_level,
        COUNT(*)                              AS nb_customers,
        ROUND(AVG(current_points), 0)         AS avg_points,
@@ -106,8 +105,8 @@ ORDER BY
     END;
 
 
--- ---- View 2 - Query 2 : Top 10 clients les plus fidèles ----
--- BUT : récompenser les clients à fort engagement (points + réservations).
+-- ---- View 2 - Query 2: Top 10 most loyal customers ----
+-- PURPOSE: reward highly-engaged customers (points + reservations).
 SELECT customer_name, tier_level, current_points, total_reservations, last_reservation_date
 FROM   Customer_Loyalty_Status
 ORDER BY current_points DESC, total_reservations DESC
@@ -115,16 +114,17 @@ LIMIT 10;
 
 
 -- =====================================================================
--- VIEW 3 (INTÉGRÉE) : Customer_Cross_Activity
+-- VIEW 3 (INTEGRATED): Customer_Cross_Activity
 -- ---------------------------------------------------------------------
--- Croise l'activité côté ORDERS & BILLING avec l'activité côté
--- RESERVATIONS / LOYALTY pour produire une vision 360° du client.
--- Combine 6 tables : customer + reservation + "ORDER" + bill + loyalty + loyalty_tier.
--- C'est cette vue qui exploite pleinement l'intégration.
+-- Crosses the ORDERS & BILLING activity with the
+-- RESERVATIONS / LOYALTY activity to produce a 360-degree view
+-- of every customer.
+-- Combines 6 tables: customer + reservation + "ORDER" + bill + loyalty + loyalty_tier.
+-- This view fully exploits the integration.
 --
--- NOTE TECHNIQUE : on pré-agrège commandes et réservations dans des
--- sous-requêtes LATERAL pour éviter le produit cartésien qui ferait
--- exploser le total_revenue (chaque bill multiplié par nb réservations).
+-- TECHNICAL NOTE: orders and reservations are pre-aggregated through
+-- LATERAL subqueries to avoid the cartesian product that would inflate
+-- total_revenue (each bill multiplied by the number of reservations).
 -- =====================================================================
 CREATE VIEW Customer_Cross_Activity AS
 SELECT
@@ -156,13 +156,13 @@ LEFT JOIN LATERAL (
     WHERE  o.customer_id = c.customer_id
 ) ord ON TRUE;
 
--- Aperçu de la vue (10 lignes)
+-- View preview (10 rows)
 SELECT * FROM Customer_Cross_Activity ORDER BY customer_id LIMIT 10;
 
 
--- ---- View 3 - Query 1 : Répartition des clients par type d'engagement ----
--- BUT : mesurer la conversion réservation → commande, et identifier les
---       segments à activer (réservation sans commande, etc.).
+-- ---- View 3 - Query 1: Customer distribution by engagement type ----
+-- PURPOSE: measure the reservation-to-order conversion rate, and
+--          identify segments to activate (e.g. reservation but no order).
 SELECT engagement_type,
        COUNT(*)                              AS nb_customers,
        ROUND(AVG(total_revenue), 2)          AS avg_revenue,
@@ -173,9 +173,9 @@ GROUP BY engagement_type
 ORDER BY nb_customers DESC;
 
 
--- ---- View 3 - Query 2 : Tier moyen des clients selon leur activité ----
--- BUT : vérifier si les clients qui réservent ET commandent sont mieux
---       récompensés par le programme de fidélité (corrélation engagement / tier).
+-- ---- View 3 - Query 2: Engagement and average revenue per loyalty tier ----
+-- PURPOSE: check whether customers who both reserve and order are
+--          better rewarded by the loyalty program (engagement-tier correlation).
 SELECT tier_level,
        COUNT(*)                              AS nb_customers,
        ROUND(AVG(nb_reservations), 1)        AS avg_reservations,

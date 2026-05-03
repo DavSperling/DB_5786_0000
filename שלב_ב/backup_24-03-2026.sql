@@ -20538,9 +20538,9 @@ COPY public.discount (discount_id, discount_name, percentage, valid_from, valid_
 --
 
 COPY public.order_item (order_item_id, order_id, menu_item_id, quantity, special_request) FROM stdin;
-1	101	50	2	Sans oignons sur une pizza
-2	101	75	2	Glaçons à part
-3	102	55	1	Cuit à point
+1	101	50	2	No onions on the pizza
+2	101	75	2	Ice on the side
+3	102	55	1	Cooked medium
 4	264	16	3	Allergic to nuts
 5	26	30	3	No salt
 6	366	95	9	\N

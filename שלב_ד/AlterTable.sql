@@ -1,14 +1,13 @@
 -- ============================================================
--- שלב ד - ALTER TABLE
--- Toutes les modifications de schéma effectuées pour rendre
--- les fonctions / procédures / triggers de l'étape 4 plus
--- intéressants et cohérents.
+-- Stage 4 - ALTER TABLE
+-- All schema modifications introduced to make the Stage 4
+-- functions / procedures / triggers more meaningful.
 -- ============================================================
 
 -- ------------------------------------------------------------
--- 1. Table de log MONTHLY_WAITER_REPORT
---    Utilisée par la procédure P2 (generate_monthly_waiter_report)
---    pour persister les KPI mensuels de chaque serveur.
+-- 1. Support table MONTHLY_WAITER_REPORT
+--    Populated by procedure P2 (generate_monthly_waiter_report)
+--    to persist monthly KPIs for each waiter.
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS MONTHLY_WAITER_REPORT CASCADE;
 
@@ -26,13 +25,13 @@ CREATE TABLE MONTHLY_WAITER_REPORT (
 );
 
 COMMENT ON TABLE MONTHLY_WAITER_REPORT
-IS 'Rapport mensuel des performances par serveur, alimenté par la procédure P2.';
+IS 'Monthly per-waiter performance report, populated by procedure P2.';
 
 
 -- ------------------------------------------------------------
--- 2. Table de log LOYALTY_AUDIT_LOG
---    Utilisée par le trigger T2 (award_loyalty_points_on_bill_update)
---    pour tracer chaque attribution automatique de points fidélité.
+-- 2. Audit table LOYALTY_AUDIT_LOG
+--    Populated by trigger T2 (award_loyalty_points_on_bill_update)
+--    to trace every automatic loyalty-points credit.
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS LOYALTY_AUDIT_LOG CASCADE;
 
@@ -47,11 +46,11 @@ CREATE TABLE LOYALTY_AUDIT_LOG (
 );
 
 COMMENT ON TABLE LOYALTY_AUDIT_LOG
-IS 'Journal d''audit du trigger T2 : trace chaque ajout automatique de points fidélité après mise à jour d''une facture.';
+IS 'Audit log for trigger T2: traces every automatic loyalty-points credit emitted after a BILL update.';
 
 
 -- ------------------------------------------------------------
--- 3. Vérifications post-ALTER
+-- 3. Post-ALTER sanity checks
 -- ------------------------------------------------------------
 SELECT 'monthly_waiter_report' AS new_table, COUNT(*) AS rows FROM MONTHLY_WAITER_REPORT
 UNION ALL

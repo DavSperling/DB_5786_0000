@@ -1,14 +1,14 @@
 -- ============================================================
--- שלב ג - INTEGRATION (Méthode א - intégration totale)
--- Département cible (local)  : ORDERS & BILLING (restaurant_db)
--- Département importé (remote): CUSTOMER / RESERVATIONS / LOYALTY (other_group_db)
--- Technique : postgres_fdw utilisé comme pont de transfert,
---             puis foreign tables supprimées en fin de script.
+-- Stage 3 - INTEGRATION (Method A - full integration)
+-- Local target department    : ORDERS & BILLING (restaurant_db)
+-- Imported remote department : CUSTOMER / RESERVATIONS / LOYALTY (other_group_db)
+-- Technique: postgres_fdw used as a transfer bridge,
+--            then foreign tables are dropped at the end.
 -- ============================================================
 
 -- =====================================================================
--- PHASE 0 : NETTOYAGE (idempotent)
---    Permet de relancer le script sans erreur si déjà exécuté.
+-- PHASE 0: CLEANUP (idempotent)
+--    Lets the script be replayed without errors if already run.
 -- =====================================================================
 ALTER TABLE "ORDER" DROP CONSTRAINT IF EXISTS fk_order_customer;
 DROP TABLE IF EXISTS feedback CASCADE;
@@ -23,32 +23,32 @@ DROP TABLE IF EXISTS customer CASCADE;
 DROP SERVER IF EXISTS other_group_server CASCADE;
 
 -- =====================================================================
--- PHASE 1 : SETUP DU FOREIGN DATA WRAPPER
+-- PHASE 1: FOREIGN DATA WRAPPER SETUP
 -- =====================================================================
 
--- 1.1 Activer l'extension postgres_fdw qui permet à PostgreSQL de
---     dialoguer avec d'autres bases PostgreSQL via des "tables étrangères".
+-- 1.1 Enable the postgres_fdw extension that lets PostgreSQL talk to
+--     other PostgreSQL databases through "foreign tables".
 CREATE EXTENSION IF NOT EXISTS postgres_fdw;
 
--- 1.2 Définir le serveur distant : la base other_group_db
---     (sur le même conteneur PostgreSQL, port interne 5432).
+-- 1.2 Define the remote server: the other_group_db database
+--     (on the same PostgreSQL container, internal port 5432).
 CREATE SERVER other_group_server
 FOREIGN DATA WRAPPER postgres_fdw
 OPTIONS (host 'localhost', dbname 'other_group_db', port '5432');
 
--- 1.3 Authentification : associer l'utilisateur local 'admin' aux
---     credentials de la base distante.
+-- 1.3 Authentication: map the local 'admin' user to the
+--     credentials of the remote database.
 CREATE USER MAPPING FOR admin
 SERVER other_group_server
 OPTIONS (user 'admin', password 'admin123');
 
 
 -- =====================================================================
--- PHASE 2 : IMPORT DES 9 TABLES
---    Ordre respecté pour les FK : référentiels → customer → tables liées.
+-- PHASE 2: IMPORT THE 9 TABLES
+--    Order is enforced for FK validity: lookups -> customer -> linked tables.
 -- =====================================================================
 
--- ---------- 2.1  loyalty_tier  (référentiel - aucune FK) ----------
+-- ---------- 2.1  loyalty_tier  (lookup table - no FK) ----------
 CREATE FOREIGN TABLE loyalty_tier_remote (
     tier_id INTEGER,
     level   VARCHAR(50)
@@ -64,7 +64,7 @@ INSERT INTO loyalty_tier (tier_id, level)
 SELECT tier_id, level FROM loyalty_tier_remote;
 
 
--- ---------- 2.2  reason  (référentiel - aucune FK) ----------
+-- ---------- 2.2  reason  (lookup table - no FK) ----------
 CREATE FOREIGN TABLE reason_remote (
     reason_id   INTEGER,
     description VARCHAR(100)
@@ -80,7 +80,7 @@ INSERT INTO reason (reason_id, description)
 SELECT reason_id, description FROM reason_remote;
 
 
--- ---------- 2.3  status_type  (référentiel - aucune FK) ----------
+-- ---------- 2.3  status_type  (lookup table - no FK) ----------
 CREATE FOREIGN TABLE status_type_remote (
     status_id   INTEGER,
     description VARCHAR(50)
@@ -96,7 +96,7 @@ INSERT INTO status_type (status_id, description)
 SELECT status_id, description FROM status_type_remote;
 
 
--- ---------- 2.4  customer  (table pivot - aucune FK sortante) ----------
+-- ---------- 2.4  customer  (pivot table - no outgoing FK) ----------
 CREATE FOREIGN TABLE customer_remote (
     customer_id INTEGER,
     first_name  VARCHAR(50),
@@ -131,7 +131,7 @@ SELECT customer_id, first_name, last_name, phone, email, created_at, is_active
 FROM customer_remote;
 
 
--- ---------- 2.5  loyalty  (FK → customer, loyalty_tier) ----------
+-- ---------- 2.5  loyalty  (FK -> customer, loyalty_tier) ----------
 CREATE FOREIGN TABLE loyalty_remote (
     loyalty_id   INTEGER,
     points       INTEGER,
@@ -156,7 +156,7 @@ SELECT loyalty_id, points, last_updated, customer_id, tier_id
 FROM loyalty_remote;
 
 
--- ---------- 2.6  loyalty_transaction  (FK → loyalty, reason) ----------
+-- ---------- 2.6  loyalty_transaction  (FK -> loyalty, reason) ----------
 CREATE FOREIGN TABLE loyalty_transaction_remote (
     transaction_id INTEGER,
     points_change  INTEGER,
@@ -181,7 +181,7 @@ SELECT transaction_id, points_change, created_at, loyalty_id, reason_id
 FROM loyalty_transaction_remote;
 
 
--- ---------- 2.7  reservation  (FK → customer, status_type) ----------
+-- ---------- 2.7  reservation  (FK -> customer, status_type) ----------
 CREATE FOREIGN TABLE reservation_remote (
     reservation_id   INTEGER,
     datetime         DATE,
@@ -211,7 +211,7 @@ SELECT reservation_id, datetime, party_size, special_requests, created_at, custo
 FROM reservation_remote;
 
 
--- ---------- 2.8  feedback  (FK → reservation) ----------
+-- ---------- 2.8  feedback  (FK -> reservation) ----------
 CREATE FOREIGN TABLE feedback_remote (
     feedback_id    INTEGER,
     rating         INTEGER,
@@ -237,7 +237,7 @@ SELECT feedback_id, rating, comment, feedback_date, reservation_id
 FROM feedback_remote;
 
 
--- ---------- 2.9  waitlist  (FK → customer, status_type) ----------
+-- ---------- 2.9  waitlist  (FK -> customer, status_type) ----------
 CREATE FOREIGN TABLE waitlist_remote (
     waitlist_id   INTEGER,
     party_size    INTEGER,
@@ -265,39 +265,39 @@ FROM waitlist_remote;
 
 
 -- =====================================================================
--- PHASE 3 : LIEN D'INTÉGRATION
---    On exploite le pivot naturel entre les 2 départements :
---    "ORDER".customer_id (déjà présent côté local) → customer(customer_id) (côté importé).
+-- PHASE 3: INTEGRATION LINK
+--    We rely on the natural pivot between the 2 departments:
+--    "ORDER".customer_id (already on the local side) -> customer(customer_id) (imported side).
 --
---    PROBLÈME : nos données Mockaroo ont généré des customer_id
---    aléatoires (1..999974) qui ne correspondent pas aux 500 clients réels.
---    DÉCISION : on remappe chaque customer_id sur la plage [1..500]
---    via la formule ((customer_id - 1) % 500) + 1, ce qui distribue
---    uniformément les commandes sur les 500 clients existants.
+--    PROBLEM: our Mockaroo data generated random customer_id values
+--    in [1..999974], which do not match the 500 actual customers.
+--    DECISION: we remap each customer_id to the [1..500] range
+--    via ((customer_id - 1) % 500) + 1, which uniformly distributes
+--    orders across the 500 existing customers.
 -- =====================================================================
 
--- 3.1 Re-mapping des customer_id de la table ORDER
+-- 3.1 Re-mapping of "ORDER".customer_id values
 UPDATE "ORDER"
 SET    customer_id = ((customer_id - 1) % 500) + 1
 WHERE  customer_id IS NOT NULL;
 
--- 3.2 Vérification : tous les customer_id de ORDER doivent maintenant exister dans customer
---     (Cette requête ne doit retourner aucune ligne)
+-- 3.2 Sanity check: every "ORDER".customer_id must now exist in customer
+--     (this query must return zero rows)
 SELECT o.order_id, o.customer_id
 FROM   "ORDER" o
 LEFT JOIN customer c ON o.customer_id = c.customer_id
 WHERE  o.customer_id IS NOT NULL AND c.customer_id IS NULL;
 
--- 3.3 Création de la clé étrangère ORDER → customer
+-- 3.3 Create the foreign key ORDER -> customer
 ALTER TABLE "ORDER"
 ADD CONSTRAINT fk_order_customer
 FOREIGN KEY (customer_id) REFERENCES customer(customer_id);
 
 
 -- =====================================================================
--- PHASE 4 : NETTOYAGE
---    Une fois les données copiées dans les vraies tables locales,
---    les foreign tables ne servent plus → on les supprime.
+-- PHASE 4: CLEANUP
+--    Once the data has been copied into the real local tables,
+--    the foreign tables are no longer needed -> drop them.
 -- =====================================================================
 DROP FOREIGN TABLE customer_remote;
 DROP FOREIGN TABLE loyalty_tier_remote;
@@ -311,7 +311,7 @@ DROP FOREIGN TABLE waitlist_remote;
 
 
 -- =====================================================================
--- PHASE 5 : CONTRÔLES POST-INTÉGRATION
+-- PHASE 5: POST-INTEGRATION CHECKS
 -- =====================================================================
 SELECT 'customer'            AS table_name, COUNT(*) FROM customer
 UNION ALL SELECT 'loyalty_tier',            COUNT(*) FROM loyalty_tier

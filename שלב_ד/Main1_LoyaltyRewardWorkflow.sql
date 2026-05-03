@@ -1,22 +1,22 @@
 -- ============================================================
--- שלב ד - PROGRAMME PRINCIPAL 1
--- Nom        : Main1_LoyaltyRewardWorkflow.sql
--- Scénario   : Le restaurant veut récompenser ses meilleurs
---              clients GOLD : on liste leur top via la fonction
---              get_top_loyalty_customers (F1) puis on applique
---              une remise supplémentaire à toutes leurs factures
---              en cours via apply_loyalty_tier_discount (P1).
--- Démontre   :
---   • Appel d'une FONCTION qui retourne un REF CURSOR.
---   • Lecture du REF CURSOR depuis le bloc principal.
---   • Appel d'une PROCÉDURE qui modifie la base.
---   • Vérification de l'état BEFORE / AFTER de BILL.
+-- Stage 4 - MAIN PROGRAM 1
+-- Name       : Main1_LoyaltyRewardWorkflow.sql
+-- Scenario   : The restaurant wants to reward its top Gold
+--              customers: list them via the function
+--              get_top_loyalty_customers (F1), then apply an
+--              extra discount to all of their in-progress
+--              bills via apply_loyalty_tier_discount (P1).
+-- Showcases  :
+--   * Calling a FUNCTION returning a REF CURSOR.
+--   * Reading the REF CURSOR from the main block.
+--   * Calling a PROCEDURE that mutates the database.
+--   * BEFORE / AFTER state inspection on BILL.
 -- ============================================================
 
 -- =========================================================
--- 0. État initial (BEFORE)
+-- 0. Initial state (BEFORE)
 -- =========================================================
-\echo '======= BEFORE : factures Gold In Progress ======='
+\echo '======= BEFORE: Gold In Progress bills ======='
 SELECT b.bill_id, b.total_amount, b.discount_amount, b.final_amount,
        o.order_status, c.customer_id, c.first_name, lt.level
   FROM bill         b
@@ -29,21 +29,21 @@ SELECT b.bill_id, b.total_amount, b.discount_amount, b.final_amount,
  ORDER BY b.bill_id
  LIMIT 10;
 
-\echo '======= BEFORE : nombre de loyalty_transaction et lignes audit ======='
+\echo '======= BEFORE: loyalty_transaction & audit counters ======='
 SELECT (SELECT COUNT(*) FROM loyalty_transaction) AS tx_count_before,
        (SELECT COUNT(*) FROM loyalty_audit_log)   AS audit_count_before;
 
 
 -- =========================================================
--- 1. Appel de la FONCTION F1 - on lit le REF CURSOR
+-- 1. Call FUNCTION F1 - read the REF CURSOR
 -- =========================================================
-\echo '======= APPEL F1 : get_top_loyalty_customers(Gold, 0) ======='
+\echo '======= CALL F1: get_top_loyalty_customers(Gold, 0) ======='
 BEGIN;
 
-    -- F1 ouvre le curseur dans la transaction courante
+    -- F1 opens the cursor in the current transaction
     SELECT get_top_loyalty_customers('Gold', 0, 'cur_main1');
 
-    -- On consomme le REF CURSOR (10 premières lignes)
+    -- Consume the REF CURSOR
     FETCH ALL IN cur_main1;
 
     CLOSE cur_main1;
@@ -52,17 +52,17 @@ COMMIT;
 
 
 -- =========================================================
--- 2. Appel de la PROCÉDURE P1 (DML)
---    On applique +5% de remise à tous les Gold In Progress.
+-- 2. Call PROCEDURE P1 (DML)
+--    Apply +5% discount to all Gold In Progress bills.
 -- =========================================================
-\echo '======= APPEL P1 : apply_loyalty_tier_discount(Gold, 5) ======='
+\echo '======= CALL P1: apply_loyalty_tier_discount(Gold, 5) ======='
 CALL apply_loyalty_tier_discount('Gold', 5);
 
 
 -- =========================================================
--- 3. État final (AFTER)
+-- 3. Final state (AFTER)
 -- =========================================================
-\echo '======= AFTER : mêmes factures, on voit les remises ======='
+\echo '======= AFTER: same bills, with new discounts ======='
 SELECT b.bill_id, b.total_amount, b.discount_amount, b.final_amount,
        o.order_status, c.customer_id, c.first_name, lt.level
   FROM bill         b
@@ -75,21 +75,21 @@ SELECT b.bill_id, b.total_amount, b.discount_amount, b.final_amount,
  ORDER BY b.bill_id
  LIMIT 10;
 
-\echo '======= AFTER : compteurs loyalty_transaction et audit ======='
+\echo '======= AFTER: loyalty_transaction & audit counters ======='
 SELECT (SELECT COUNT(*) FROM loyalty_transaction) AS tx_count_after,
        (SELECT COUNT(*) FROM loyalty_audit_log)   AS audit_count_after;
 
 
 -- =========================================================
--- 4. Démo de gestion d'EXCEPTION
---    Tier invalide -> F1 doit lever une exception.
+-- 4. EXCEPTION DEMO
+--    Invalid tier -> F1 must raise an exception.
 -- =========================================================
-\echo '======= DÉMO EXCEPTION : tier invalide ======='
+\echo '======= EXCEPTION DEMO: invalid tier ======='
 DO $$
 BEGIN
     PERFORM get_top_loyalty_customers('VIP', 0);
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'Exception attrapée comme prévu : %', SQLERRM;
+        RAISE NOTICE 'Exception caught as expected: %', SQLERRM;
 END;
 $$;

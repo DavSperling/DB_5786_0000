@@ -1449,7 +1449,7 @@ The result is a unified database of **15 tables** and **~58 000 rows** offering 
 | `group2-dsd.png` / `group2-erd.png` | Imported department diagrams |
 | `*.erdplus` | Editable ERDPlus sources for each diagram |
 | `restore_other_group_db.sh` | Script to restore the received backup into `other_group_db` |
-| `דוח_פרויקט_שלב_ג.md` | Stand-alone French project report |
+| `דוח_פרויקט_שלב_ג.md` | Stand-alone project report |
 
 ---
 
@@ -1465,7 +1465,7 @@ The result is a unified database of **15 tables** and **~58 000 rows** offering 
 - **2 Main programs** that orchestrate Function + Procedure together
 - **`AlterTable.sql`** with the schema changes required to make those programs more meaningful
 - **`backup4.sql`** – full pg_dump after Stage 4
-- **`דוח_פרויקט_שלב_ד.md`** – stand-alone French project report
+- **`דוח_פרויקט_שלב_ד.md`** - stand-alone project report
 
 > **Tag git :** `stage4` marks the end of this stage.
 
@@ -1535,10 +1535,10 @@ DECLARE
 BEGIN
     -- Validation
     IF p_tier NOT IN ('Bronze','Silver','Gold','Platinum') THEN
-        RAISE EXCEPTION 'Tier invalide "%".', p_tier USING ERRCODE='22023';
+        RAISE EXCEPTION 'Invalid tier "%".', p_tier USING ERRCODE='22023';
     END IF;
     IF p_min_orders < 0 THEN
-        RAISE EXCEPTION 'min_orders < 0 (% donné).', p_min_orders USING ERRCODE='22023';
+        RAISE EXCEPTION 'Minimum order count must be >= 0 (got: %).', p_min_orders USING ERRCODE='22023';
     END IF;
 
     -- At least one matching customer?
@@ -1547,8 +1547,8 @@ BEGIN
                       JOIN loyalty_tier lt ON l.tier_id = lt.tier_id
      WHERE lt.level = p_tier;
     IF v_count = 0 THEN
-        RAISE EXCEPTION 'Aucun client trouvé pour le tier "%".', p_tier
-            USING ERRCODE='P0002';   -- équiv. NO_DATA_FOUND
+        RAISE EXCEPTION 'No customer found for tier "%".', p_tier
+            USING ERRCODE='P0002';   -- equivalent to NO_DATA_FOUND
     END IF;
 
     -- Open the REF CURSOR
@@ -1578,16 +1578,16 @@ BEGIN
     RETURN p_cursor;
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'F1 : ERREUR % - %', SQLSTATE, SQLERRM;
+        RAISE NOTICE 'F1: ERROR % - %', SQLSTATE, SQLERRM;
         RAISE;
 END;
 $$;
 ```
 
-📷 _Execution proof (`Gold` tier, no minimum order count) — 128 customers returned, top 3 shown:_
+_Execution proof (`Gold` tier, no minimum order count) - 128 customers returned, top 3 shown:_
 
 ```
-NOTICE:  Curseur "cur_main1" ouvert : tier=Gold / min_orders=0 / clients_dispo=128
+NOTICE:  Cursor "cur_main1" opened: tier=Gold / min_orders=0 / matching_customers=128
 
  customer_id |  customer_name   | tier_level | loyalty_points | nb_orders | total_revenue | reward_category
 -------------+------------------+------------+----------------+-----------+---------------+-----------------
@@ -1599,11 +1599,11 @@ NOTICE:  Curseur "cur_main1" ouvert : tier=Gold / min_orders=0 / clients_dispo=1
 (128 rows)
 ```
 
-📷 _Exception thrown when called with an invalid tier (`'VIP'`):_
+_Exception thrown when called with an invalid tier (`'VIP'`):_
 
 ```
-NOTICE:  F1 : ERREUR 22023 - Tier invalide "VIP". Valeurs autorisées : Bronze, Silver, Gold, Platinum.
-NOTICE:  Exception attrapée comme prévu : Tier invalide "VIP". Valeurs autorisées : Bronze, Silver, Gold, Platinum.
+NOTICE:  F1: ERROR 22023 - Invalid tier "VIP". Allowed values: Bronze, Silver, Gold, Platinum.
+NOTICE:  Exception caught as expected: Invalid tier "VIP". Allowed values: Bronze, Silver, Gold, Platinum.
 ```
 
 > ✅ The REF CURSOR is opened in F1, returned to the caller, then consumed via `FETCH ALL`. The `EXCEPTION` block correctly re-raises validation errors.
@@ -1632,10 +1632,10 @@ DECLARE
     v_avg      NUMERIC(14,2);
 BEGIN
     IF p_start IS NULL OR p_end IS NULL THEN
-        RAISE EXCEPTION 'Bornes NULL.' USING ERRCODE='22023';
+        RAISE EXCEPTION 'Period bounds cannot be NULL.' USING ERRCODE='22023';
     END IF;
     IF p_end < p_start THEN
-        RAISE EXCEPTION 'Période invalide (% < %).', p_end, p_start USING ERRCODE='22023';
+        RAISE EXCEPTION 'Invalid period (% < %).', p_end, p_start USING ERRCODE='22023';
     END IF;
 
     OPEN cur_bills(p_start, p_end);
@@ -1652,40 +1652,40 @@ BEGIN
     CLOSE cur_bills;
 
     IF v_kept = 0 THEN
-        RAISE EXCEPTION 'Aucune facture exploitable entre % et % (skipped=%).',
+        RAISE EXCEPTION 'No exploitable bill between % and % (skipped=%).',
             p_start, p_end, v_skipped USING ERRCODE='P0002';
     END IF;
     v_avg := v_total / v_kept;
-    RAISE NOTICE 'Période %..% : gardées=%, ignorées=%, revenu=% (avg=%)',
+    RAISE NOTICE 'Period %..%: kept=%, skipped=%, revenue=% (avg=%)',
                  p_start, p_end, v_kept, v_skipped, v_total, v_avg;
     RETURN v_total;
 EXCEPTION
     WHEN division_by_zero THEN RETURN 0;
     WHEN OTHERS THEN
-        RAISE NOTICE 'F2 : ERREUR % - %', SQLSTATE, SQLERRM;
+        RAISE NOTICE 'F2: ERROR % - %', SQLSTATE, SQLERRM;
         RAISE;
 END;
 $$;
 ```
 
-📷 _Execution proof for the full year 2024:_
+_Execution proof for the full year 2024:_
 
 ```
-NOTICE:  Période 2024-01-01..2024-12-31 : gardées=196, ignorées=301, revenu=80841.18 (avg=412.46)
+NOTICE:  Period 2024-01-01..2024-12-31: kept=196, skipped=301, revenue=80841.18 (avg=412.46)
 
  revenue_2024
 --------------
      80841.18
 ```
 
-📷 _Exception thrown for an empty period (`1990`):_
+_Exception thrown for an empty period (`1990`):_
 
 ```
-NOTICE:  F2 : ERREUR P0002 - Aucune facture exploitable entre 1990-01-01 et 1990-12-31 (skipped=0).
-NOTICE:  Exception attrapée comme prévu : Aucune facture exploitable entre 1990-01-01 et 1990-12-31 (skipped=0).
+NOTICE:  F2: ERROR P0002 - No exploitable bill between 1990-01-01 and 1990-12-31 (skipped=0).
+NOTICE:  Exception caught as expected: No exploitable bill between 1990-01-01 and 1990-12-31 (skipped=0).
 ```
 
-> ✅ 497 bills walked in 2024 (196 kept + 301 cancelled), net revenue **80 841,18 €**, exception properly raised and caught on an empty period.
+> 497 bills walked in 2024 (196 kept + 301 cancelled), net revenue **80,841.18 EUR**, exception properly raised and caught on an empty period.
 
 ---
 
@@ -1698,7 +1698,7 @@ NOTICE:  Exception attrapée comme prévu : Aucune facture exploitable entre 199
 ```sql
 CREATE OR REPLACE PROCEDURE apply_loyalty_tier_discount(
     p_tier      VARCHAR,
-    p_extra_pct NUMERIC                   -- pourcentage (ex 5 pour 5%)
+    p_extra_pct NUMERIC                   -- percentage (e.g. 5 for 5%)
 ) LANGUAGE plpgsql AS $$
 DECLARE
     cur_eligible CURSOR (tier_filter VARCHAR) FOR
@@ -1723,10 +1723,10 @@ DECLARE
 BEGIN
     -- Validation
     IF p_tier NOT IN ('Bronze','Silver','Gold','Platinum') THEN
-        RAISE EXCEPTION 'Tier invalide "%".', p_tier USING ERRCODE='22023';
+        RAISE EXCEPTION 'Invalid tier "%".', p_tier USING ERRCODE='22023';
     END IF;
     IF p_extra_pct IS NULL OR p_extra_pct < 0 OR p_extra_pct > 100 THEN
-        RAISE EXCEPTION 'Pourcentage invalide.' USING ERRCODE='22023';
+        RAISE EXCEPTION 'Invalid percentage.' USING ERRCODE='22023';
     END IF;
 
     -- Cap discount based on tier
@@ -1737,7 +1737,7 @@ BEGIN
 
     SELECT reason_id INTO v_default_reason FROM reason ORDER BY reason_id LIMIT 1;
     IF v_default_reason IS NULL THEN
-        RAISE EXCEPTION 'Aucune entrée dans reason.' USING ERRCODE='P0002';
+        RAISE EXCEPTION 'No row in reason.' USING ERRCODE='P0002';
     END IF;
 
     OPEN cur_eligible(p_tier);
@@ -1763,17 +1763,17 @@ BEGIN
     END LOOP;
     CLOSE cur_eligible;
 
-    RAISE NOTICE 'P1 : tier=%, pct_applique=%, factures_mises_a_jour=%',
+    RAISE NOTICE 'P1: tier=%, applied_pct=%, bills_updated=%',
                  p_tier, v_applied_pct, v_count;
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'P1 : ERREUR % - %', SQLSTATE, SQLERRM;
+        RAISE NOTICE 'P1: ERROR % - %', SQLSTATE, SQLERRM;
         RAISE;
 END;
 $$;
 ```
 
-📷 _Execution proof (Gold tier, +5 %), `BILL` BEFORE / AFTER:_
+_Execution proof (Gold tier, +5%), `BILL` BEFORE / AFTER:_
 
 **Before (10 first Gold "In Progress" bills):**
 
@@ -1792,26 +1792,26 @@ $$;
      354 |       520.85 |           10.00 |       402.11 | In Progress  | Gold
 ```
 
-**Call:** `CALL apply_loyalty_tier_discount('Gold', 5);` → `NOTICE: P1 : tier=Gold, pct_applique=5.00, factures_mises_a_jour=14`
+**Call:** `CALL apply_loyalty_tier_discount('Gold', 5);` -> `NOTICE: P1: tier=Gold, applied_pct=5.00, bills_updated=14`
 
 **After:**
 
 ```
  bill_id | total_amount | discount_amount | final_amount | order_status | level
 ---------+--------------+-----------------+--------------+--------------+-------
-     254 |       590.36 |           39.52 |       550.84 | In Progress  | Gold   ← +29.52 €
-     263 |       152.22 |           17.61 |       134.61 | In Progress  | Gold   ← + 7.61 €
-     268 |       360.87 |           28.04 |       332.83 | In Progress  | Gold   ← +18.04 €
-     276 |       104.85 |           15.24 |        89.61 | In Progress  | Gold   ← + 5.24 €
-     286 |       760.43 |           48.02 |       712.41 | In Progress  | Gold   ← +38.02 €
-     299 |        38.24 |           11.91 |        26.33 | In Progress  | Gold   ← + 1.91 €
-     333 |        13.89 |           10.69 |         3.20 | In Progress  | Gold   ← + 0.69 €
-     350 |       224.70 |           21.24 |       203.46 | In Progress  | Gold   ← +11.24 €
-     353 |       598.34 |           39.92 |       558.42 | In Progress  | Gold   ← +29.92 €
-     354 |       520.85 |           36.04 |       484.81 | In Progress  | Gold   ← +26.04 €
+     254 |       590.36 |           39.52 |       550.84 | In Progress  | Gold   <- +29.52 EUR
+     263 |       152.22 |           17.61 |       134.61 | In Progress  | Gold   <- + 7.61 EUR
+     268 |       360.87 |           28.04 |       332.83 | In Progress  | Gold   <- +18.04 EUR
+     276 |       104.85 |           15.24 |        89.61 | In Progress  | Gold   <- + 5.24 EUR
+     286 |       760.43 |           48.02 |       712.41 | In Progress  | Gold   <- +38.02 EUR
+     299 |        38.24 |           11.91 |        26.33 | In Progress  | Gold   <- + 1.91 EUR
+     333 |        13.89 |           10.69 |         3.20 | In Progress  | Gold   <- + 0.69 EUR
+     350 |       224.70 |           21.24 |       203.46 | In Progress  | Gold   <- +11.24 EUR
+     353 |       598.34 |           39.92 |       558.42 | In Progress  | Gold   <- +29.92 EUR
+     354 |       520.85 |           36.04 |       484.81 | In Progress  | Gold   <- +26.04 EUR
 ```
 
-> ✅ 14 bills updated, `loyalty_transaction` grew from 20 000 → 20 027 (+14 directly from P1, +13 from Trigger T2 cascading on the very `UPDATE BILL` statements).
+> 14 bills updated, `loyalty_transaction` grew from 20,000 -> 20,027 (+14 directly from P1, +13 from Trigger T2 cascading on the very `UPDATE BILL` statements).
 
 ---
 
@@ -1832,10 +1832,10 @@ DECLARE
     v_inserted        INT           := 0;
 BEGIN
     IF p_year IS NULL OR p_month IS NULL THEN
-        RAISE EXCEPTION 'Année et mois NULL.' USING ERRCODE='22023';
+        RAISE EXCEPTION 'Year and month NULL.' USING ERRCODE='22023';
     END IF;
     IF p_month < 1 OR p_month > 12 THEN
-        RAISE EXCEPTION 'Mois invalide (%).', p_month USING ERRCODE='22023';
+        RAISE EXCEPTION 'Invalid month (%).', p_month USING ERRCODE='22023';
     END IF;
 
     -- Idempotent: clear existing rows first
@@ -1869,31 +1869,31 @@ BEGIN
     END LOOP;
 
     IF v_inserted = 0 THEN
-        RAISE EXCEPTION 'Aucune commande pour %-%.', p_year, p_month
+        RAISE EXCEPTION 'No order found for %-%.', p_year, p_month
             USING ERRCODE='P0002';
     END IF;
-    RAISE NOTICE '=== Rapport %-% : % serveurs, % commandes, revenu = % ===',
+    RAISE NOTICE '=== Report %-%: % waiters, % orders, revenue = % ===',
                  p_year, p_month, v_inserted, v_total_orders, v_total_revenue;
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'P2 : ERREUR % - %', SQLSTATE, SQLERRM;
+        RAISE NOTICE 'P2: ERROR % - %', SQLSTATE, SQLERRM;
         RAISE;
 END;
 $$;
 ```
 
-📷 _Execution proof — `CALL generate_monthly_waiter_report(2024, 4);`_
+_Execution proof - `CALL generate_monthly_waiter_report(2024, 4);`_
 
 ```
 NOTICE:    -> waiter_id=324, orders=2, revenue=1788.88, perf=HIGH
 NOTICE:    -> waiter_id=148, orders=2, revenue=1465.24, perf=MEDIUM
 NOTICE:    -> waiter_id=282, orders=2, revenue=1419.46, perf=MEDIUM
 ... (225 more lines) ...
-NOTICE:  === Rapport 2024-4 : 228 serveurs, 252 commandes, revenu total = 96490.46 ===
+NOTICE:  === Report 2024-4: 228 waiters, 252 orders, total revenue = 96490.46 ===
 CALL
 ```
 
-📷 _Result in `MONTHLY_WAITER_REPORT` (top 5):_
+_Result in `MONTHLY_WAITER_REPORT` (top 5):_
 
 ```
  report_year | report_month | waiter_id | nb_orders | total_revenue | avg_bill | perf_level
@@ -1905,7 +1905,7 @@ CALL
         2024 |            4 |       130 |         2 |       1340.58 |   670.29 | MEDIUM
 ```
 
-📷 _Distribution by performance level:_
+_Distribution by performance level:_
 
 ```
  perf_level | nb_waiters | avg_revenue
@@ -1915,14 +1915,14 @@ CALL
  LOW        |        135 |      190.09
 ```
 
-📷 _Exception thrown on a month without orders (`1999-01`):_
+_Exception thrown on a month without orders (`1999-01`):_
 
 ```
-NOTICE:  P2 : ERREUR P0002 - Aucune commande pour 1999-1.
-NOTICE:  Exception attrapée comme prévu : Aucune commande pour 1999-1.
+NOTICE:  P2: ERROR P0002 - No order found for 1999-1.
+NOTICE:  Exception caught as expected: No order found for 1999-1.
 ```
 
-> ✅ 228 rows inserted in a single call, idempotent re-runs, exception properly raised and caught on empty months.
+> 228 rows inserted in a single call, idempotent re-runs, exception properly raised and caught on empty months.
 
 ---
 
@@ -1940,12 +1940,12 @@ BEGIN
     SELECT b.final_amount INTO v_bill_total
       FROM bill b WHERE b.bill_id = NEW.bill_id;
     IF NOT FOUND THEN
-        RAISE EXCEPTION 'Trigger T1 : facture % inexistante.', NEW.bill_id
+        RAISE EXCEPTION 'Trigger T1: bill % does not exist.', NEW.bill_id
             USING ERRCODE='P0002';
     END IF;
     IF NEW.amount > v_bill_total THEN
         RAISE EXCEPTION
-            'Trigger T1 : paiement % > montant facture % (bill_id=%).',
+            'Trigger T1: payment % > bill amount % (bill_id=%).',
             NEW.amount, v_bill_total, NEW.bill_id USING ERRCODE='23514';
     END IF;
     IF NEW.payment_time IS NULL THEN
@@ -1960,22 +1960,22 @@ BEFORE INSERT OR UPDATE ON PAYMENT
 FOR EACH ROW EXECUTE FUNCTION fn_validate_payment_amount();
 ```
 
-📷 _Execution proof (3 scenarios):_
+_Execution proof (3 scenarios):_
 
 ```
-======= TEST T1 (1) : INSERT paiement valide =======
-INSERT 0 1                          ← accepté
+======= TEST T1 (1): valid payment INSERT =======
+INSERT 0 1                          <- accepted
 
-======= TEST T1 (2) : INSERT paiement EXCESSIF -> exception attendue =======
-NOTICE:  Exception attrapee comme prevu :
-         Trigger T1 : paiement 99999.00 > montant facture 299.11 (bill_id=1). (23514)
+======= TEST T1 (2): excessive INSERT -> exception expected =======
+NOTICE:  Exception caught as expected:
+         Trigger T1: payment 99999.00 > bill amount 299.11 (bill_id=1). (23514)
 
-======= TEST T1 (3) : UPDATE paiement EXCESSIF -> exception attendue =======
-NOTICE:  Exception attrapee comme prevu :
-         Trigger T1 : paiement 99999.00 > montant facture 299.11 (bill_id=1). (23514)
+======= TEST T1 (3): excessive UPDATE -> exception expected =======
+NOTICE:  Exception caught as expected:
+         Trigger T1: payment 99999.00 > bill amount 299.11 (bill_id=1). (23514)
 ```
 
-> ✅ Valid payments pass; over-paying inserts and updates are both rejected with `SQLSTATE 23514`.
+> Valid payments pass; over-paying inserts and updates are both rejected with `SQLSTATE 23514`.
 
 ---
 
@@ -1983,7 +1983,7 @@ NOTICE:  Exception attrapee comme prevu :
 
 > ⚠️ **This trigger satisfies the course requirement of *at least one trigger on `UPDATE`*.**
 
-> **🎯 Business Context:** Whenever a bill's `final_amount` is recalculated (price correction, discount, refund, etc.), the linked customer should automatically earn loyalty points (1 point per 10 € of the new amount). The trigger writes three things at once: it updates `loyalty.points`, inserts a `loyalty_transaction` row, and writes an audit entry to `loyalty_audit_log`.
+> **🎯 Business Context:** Whenever a bill's `final_amount` is recalculated (price correction, discount, refund, etc.), the linked customer should automatically earn loyalty points (1 point per 10 EUR of the new amount). The trigger writes three things at once: it updates `loyalty.points`, inserts a `loyalty_transaction` row, and writes an audit entry to `loyalty_audit_log`.
 
 **Key PL/pgSQL elements:** `AFTER UPDATE` · `IS NOT DISTINCT FROM` to detect real changes · 3 chained DML (`UPDATE` + `INSERT` + `INSERT`) · graceful skip when no loyalty record exists · `OTHERS` exception block.
 
@@ -2044,7 +2044,7 @@ BEGIN
     RETURN NEW;
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'T2 : ERREUR % - %', SQLSTATE, SQLERRM;
+        RAISE NOTICE 'T2: ERROR % - %', SQLSTATE, SQLERRM;
         RAISE;
 END;
 $$;
@@ -2054,7 +2054,7 @@ AFTER UPDATE ON BILL
 FOR EACH ROW EXECUTE FUNCTION fn_award_loyalty_points_on_bill_update();
 ```
 
-📷 _Isolated proof on `bill_id = 1`:_
+_Isolated proof on `bill_id = 1`:_
 
 **Before:**
 
@@ -2075,110 +2075,110 @@ FOR EACH ROW EXECUTE FUNCTION fn_award_loyalty_points_on_bill_update();
 ```
  bill_id | final_amount | pts_after
 ---------+--------------+-----------
-       1 |       349.11 |      6031   ← +34 points = floor(349.11 / 10)
+       1 |       349.11 |      6031   <- +34 points = floor(349.11 / 10)
 
  log_id | bill_id | customer_id | points_awarded | old_amount | new_amount |   logged_at
 --------+---------+-------------+----------------+------------+------------+----------------------------
      15 |       1 |          58 |             34 |     299.11 |     349.11 | 2026-05-03 13:56:40.385231
 ```
 
-> ✅ The trigger detects the actual change, credits **34 points** to customer 58, traces the event in `loyalty_audit_log` (15<sup>th</sup> log — the previous 14 were emitted automatically by the `UPDATE BILL` statements run by Procedure P1 in `Main1`).
+> The trigger detects the actual change, credits **34 points** to customer 58, traces the event in `loyalty_audit_log` (15th log - the previous 14 were emitted automatically by the `UPDATE BILL` statements run by Procedure P1 in `Main1`).
 
 ---
 
 ## 🟢 Main Program 1 – Loyalty Reward Workflow (F1 + P1)
 
-> **🎯 Business Context:** End-to-end demonstration of the *loyalty reward* business case — list top Gold customers (F1), apply an extra 5 % discount to their In-Progress bills (P1), then verify both the database state and the exception path.
+> **🎯 Business Context:** End-to-end demonstration of the *loyalty reward* business case - list top Gold customers (F1), apply an extra 5% discount to their In-Progress bills (P1), then verify both the database state and the exception path.
 
 **Steps performed by `Main1_LoyaltyRewardWorkflow.sql`:**
 
 ```sql
--- 1. BEFORE : 10 first Gold In Progress bills + counters
+-- 1. BEFORE: 10 first Gold In Progress bills + counters
 SELECT b.bill_id, b.total_amount, b.discount_amount, b.final_amount, ...
 SELECT (SELECT COUNT(*) FROM loyalty_transaction) AS tx_count_before, ...
 
--- 2. F1 : open + consume the REF CURSOR
+-- 2. F1: open + consume the REF CURSOR
 BEGIN;
     SELECT get_top_loyalty_customers('Gold', 0, 'cur_main1');
     FETCH ALL IN cur_main1;
     CLOSE cur_main1;
 COMMIT;
 
--- 3. P1 : DML batch
+-- 3. P1: DML batch
 CALL apply_loyalty_tier_discount('Gold', 5);
 
--- 4. AFTER : same 10 bills, new counters
+-- 4. AFTER: same 10 bills, new counters
 
--- 5. EXCEPTION DEMO : invalid tier
+-- 5. EXCEPTION DEMO: invalid tier
 DO $$ BEGIN PERFORM get_top_loyalty_customers('VIP', 0);
 EXCEPTION WHEN OTHERS THEN
-    RAISE NOTICE 'Exception attrapée comme prévu : %', SQLERRM;
+    RAISE NOTICE 'Exception caught as expected: %', SQLERRM;
 END; $$;
 ```
 
-📊 **Key results:**
+**Key results:**
 
 | Metric                                  | Before | After |
 |------------------------------------------|--------|-------|
-| Gold customers returned by F1            |   —    | 128   |
-| `BILL` rows updated by P1                |   —    | 14    |
-| `loyalty_transaction` count              | 20 000 | 20 027 (+14 from P1, +13 cascaded from T2) |
+| Gold customers returned by F1            |   -    | 128   |
+| `BILL` rows updated by P1                |   -    | 14    |
+| `loyalty_transaction` count              | 20,000 | 20,027 (+14 from P1, +13 cascaded from T2) |
 | `loyalty_audit_log` count                |    0   | 14    |
-| Exception caught for tier `'VIP'`        |   —    | ✅    |
+| Exception caught for tier `'VIP'`        |   -    | yes   |
 
-> ✅ Function → procedure → automatic trigger cascade → caught exception, all observable in the live PostgreSQL output.
+> Function -> procedure -> automatic trigger cascade -> caught exception, all observable in the live PostgreSQL output.
 
 ---
 
 ## 🟢 Main Program 2 – Monthly Revenue Workflow (F2 + P2)
 
-> **🎯 Business Context:** Monthly closing — total yearly revenue (F2) followed by a per-waiter persisted report for the busiest month (P2). Two extra calls deliberately trigger exceptions to prove the robustness of the code.
+> **🎯 Business Context:** Monthly closing - total yearly revenue (F2) followed by a per-waiter persisted report for the busiest month (P2). Two extra calls deliberately trigger exceptions to prove the robustness of the code.
 
 **Steps performed by `Main2_MonthlyRevenueWorkflow.sql`:**
 
 ```sql
--- 0. CTE to detect the busiest (year, month) → 2024-04 with 252 orders
+-- 0. CTE to detect the busiest (year, month) -> 2024-04 with 252 orders
 WITH best_month AS (
     SELECT EXTRACT(YEAR  FROM o.order_time)::INT AS y,
            EXTRACT(MONTH FROM o.order_time)::INT AS m, COUNT(*) AS nb
       FROM "ORDER" o GROUP BY 1,2 ORDER BY nb DESC LIMIT 1)
 SELECT * FROM best_month;
 
--- 1. BEFORE : MONTHLY_WAITER_REPORT empty
+-- 1. BEFORE: MONTHLY_WAITER_REPORT empty
 SELECT COUNT(*) AS nb_rows_before FROM MONTHLY_WAITER_REPORT;
 
--- 2. F2 : scalar revenue for full year 2024
+-- 2. F2: scalar revenue for full year 2024
 SELECT calculate_period_revenue(DATE '2024-01-01', DATE '2024-12-31') AS revenue_2024;
 
--- 3. P2 : generate report for April 2024
+-- 3. P2: generate report for April 2024
 CALL generate_monthly_waiter_report(2024, 4);
 
--- 4. AFTER : top 10 + perf-level distribution
+-- 4. AFTER: top 10 + perf-level distribution
 
--- 5. EXCEPTION DEMO 1 : F2 on empty period
+-- 5. EXCEPTION DEMO 1: F2 on empty period
 DO $$ DECLARE v_rev NUMERIC; BEGIN
     v_rev := calculate_period_revenue(DATE '1990-01-01', DATE '1990-12-31');
 EXCEPTION WHEN OTHERS THEN
-    RAISE NOTICE 'Exception attrapée comme prévu : %', SQLERRM; END; $$;
+    RAISE NOTICE 'Exception caught as expected: %', SQLERRM; END; $$;
 
--- 6. EXCEPTION DEMO 2 : P2 on empty month
+-- 6. EXCEPTION DEMO 2: P2 on empty month
 DO $$ BEGIN CALL generate_monthly_waiter_report(1999, 1);
 EXCEPTION WHEN OTHERS THEN
-    RAISE NOTICE 'Exception attrapée comme prévu : %', SQLERRM; END; $$;
+    RAISE NOTICE 'Exception caught as expected: %', SQLERRM; END; $$;
 ```
 
-📊 **Key results:**
+**Key results:**
 
-| Metric                                          | Value           |
-|--------------------------------------------------|-----------------|
-| Net revenue 2024 (F2)                            | **80 841,18 €** |
-| Bills walked / kept / cancelled                  | 497 / 196 / 301 |
-| Rows inserted in `MONTHLY_WAITER_REPORT` (P2)    | 228             |
-| Performance distribution (HIGH / MEDIUM / LOW)   | 1 / 92 / 135    |
-| Exception caught on `1990` empty period          | ✅              |
-| Exception caught on `1999-01` empty month        | ✅              |
+| Metric                                          | Value             |
+|--------------------------------------------------|-------------------|
+| Net revenue 2024 (F2)                            | **80,841.18 EUR** |
+| Bills walked / kept / cancelled                  | 497 / 196 / 301   |
+| Rows inserted in `MONTHLY_WAITER_REPORT` (P2)    | 228               |
+| Performance distribution (HIGH / MEDIUM / LOW)   | 1 / 92 / 135      |
+| Exception caught on `1990` empty period          | yes               |
+| Exception caught on `1999-01` empty month        | yes               |
 
-> ✅ Function (scalar) → procedure (DML) → exception demos, all reproducible from `Main2_MonthlyRevenueWorkflow.sql`.
+> Function (scalar) -> procedure (DML) -> exception demos, all reproducible from `Main2_MonthlyRevenueWorkflow.sql`.
 
 ---
 
@@ -2208,7 +2208,7 @@ In this stage we:
 - Built **2 main programs** that orchestrate function + procedure + trigger cascade end-to-end and prove the exception paths.
 - Added two new persistent tables (`MONTHLY_WAITER_REPORT`, `LOYALTY_AUDIT_LOG`) bundled in `AlterTable.sql`.
 - Captured the **live execution proof** of every program (BEFORE/AFTER tables, NOTICE messages, caught exceptions).
-- Created a dedicated **stand-alone French report** (`דוח_פרויקט_שלב_ד.md`).
+- Created a dedicated **stand-alone project report** (`דוח_פרויקט_שלב_ד.md`).
 - Tagged the resulting commit `stage4` in git.
 
 Combined with Stages 1–3, the database now exposes a complete server-side toolkit: business-rule enforcement (triggers), batch processing (procedures), analytical access (functions + views), and orchestration (main programs).
@@ -2229,7 +2229,7 @@ Combined with Stages 1–3, the database now exposes a complete server-side tool
 | `Main1_LoyaltyRewardWorkflow.sql`                 | Main program — F1 + P1 |
 | `Main2_MonthlyRevenueWorkflow.sql`                | Main program — F2 + P2 |
 | `backup4.sql`                                     | Full pg_dump after Stage 4 |
-| `דוח_פרויקט_שלב_ד.md`                              | Stand-alone French project report |
+| `דוח_פרויקט_שלב_ד.md`                              | Stand-alone project report |
 
 ---
 

@@ -115,7 +115,7 @@ CREATE PROCEDURE public.apply_loyalty_tier_discount(IN p_tier character varying,
     LANGUAGE plpgsql
     AS $$
 DECLARE
-    -- ---- Curseur explicite : factures éligibles + tier client ----
+    -- ---- Explicit cursor: eligible bills + customer tier ----
     cur_eligible CURSOR (tier_filter VARCHAR) FOR
         SELECT b.bill_id,
                b.total_amount,
@@ -142,19 +142,19 @@ DECLARE
     v_count           INT := 0;
     v_default_reason  INT;
 BEGIN
-    -- ---------- 1. Validation des entrées ----------
+    -- ---------- 1. Input validation ----------
     IF p_tier NOT IN ('Bronze','Silver','Gold','Platinum') THEN
-        RAISE EXCEPTION 'Tier invalide "%".', p_tier
+        RAISE EXCEPTION 'Invalid tier "%".', p_tier
             USING ERRCODE = '22023';
     END IF;
 
     IF p_extra_pct IS NULL OR p_extra_pct < 0 OR p_extra_pct > 100 THEN
-        RAISE EXCEPTION 'Pourcentage invalide (reçu : %). Attendu entre 0 et 100.',
+        RAISE EXCEPTION 'Invalid percentage (got: %). Expected between 0 and 100.',
                         p_extra_pct
             USING ERRCODE = '22023';
     END IF;
 
-    -- ---------- 2. Plafond par tier (CASE) ----------
+    -- ---------- 2. Per-tier cap (CASE) ----------
     v_max_pct := CASE p_tier
                      WHEN 'Bronze'   THEN 10
                      WHEN 'Silver'   THEN 15
@@ -165,11 +165,11 @@ BEGIN
     v_applied_pct := LEAST(p_extra_pct, v_max_pct);
 
     IF v_applied_pct < p_extra_pct THEN
-        RAISE NOTICE 'Pourcentage demandé (%) plafonné à % pour le tier %.',
+        RAISE NOTICE 'Requested percentage (%) capped at % for tier %.',
                      p_extra_pct, v_applied_pct, p_tier;
     END IF;
 
-    -- ---------- 3. Trouver une raison existante pour les transactions de fidélité ----------
+    -- ---------- 3. Pick an existing reason for the loyalty transactions ----------
     SELECT reason_id
       INTO v_default_reason
       FROM reason
@@ -177,28 +177,28 @@ BEGIN
      LIMIT 1;
 
     IF v_default_reason IS NULL THEN
-        RAISE EXCEPTION 'Aucune entrée dans la table "reason" : impossible d''insérer dans loyalty_transaction.'
+        RAISE EXCEPTION 'No row in table "reason": cannot insert into loyalty_transaction.'
             USING ERRCODE = 'P0002';
     END IF;
 
-    -- ---------- 4. Boucle sur le curseur explicite ----------
+    -- ---------- 4. Walk the explicit cursor ----------
     OPEN cur_eligible(p_tier);
     LOOP
         FETCH cur_eligible INTO rec;
         EXIT WHEN NOT FOUND;
 
-        -- Calculs
+        -- Computations
         v_extra_amount := ROUND(rec.total_amount * v_applied_pct / 100, 2);
         v_new_discount := COALESCE(rec.discount_amount, 0) + v_extra_amount;
         v_new_final    := GREATEST(rec.total_amount - v_new_discount, 0);
 
-        -- DML #1 : UPDATE bill
+        -- DML #1: UPDATE bill
         UPDATE bill
            SET discount_amount = v_new_discount,
                final_amount    = v_new_final
          WHERE bill_id = rec.bill_id;
 
-        -- DML #2 : INSERT loyalty_transaction (1 point fidélité offert pour chaque euro de remise)
+        -- DML #2: INSERT loyalty_transaction (1 loyalty point per euro of discount)
         INSERT INTO loyalty_transaction (
             transaction_id, points_change, created_at, loyalty_id, reason_id
         )
@@ -214,12 +214,12 @@ BEGIN
     END LOOP;
     CLOSE cur_eligible;
 
-    RAISE NOTICE 'apply_loyalty_tier_discount : tier=%, pct_applique=%, factures_mises_a_jour=%',
+    RAISE NOTICE 'apply_loyalty_tier_discount: tier=%, applied_pct=%, bills_updated=%',
                  p_tier, v_applied_pct, v_count;
 
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'apply_loyalty_tier_discount : ERREUR % - %', SQLSTATE, SQLERRM;
+        RAISE NOTICE 'apply_loyalty_tier_discount: ERROR % - %', SQLSTATE, SQLERRM;
         RAISE;
 END;
 $$;
@@ -231,7 +231,7 @@ ALTER PROCEDURE public.apply_loyalty_tier_discount(IN p_tier character varying, 
 -- Name: PROCEDURE apply_loyalty_tier_discount(IN p_tier character varying, IN p_extra_pct numeric); Type: COMMENT; Schema: public; Owner: admin
 --
 
-COMMENT ON PROCEDURE public.apply_loyalty_tier_discount(IN p_tier character varying, IN p_extra_pct numeric) IS 'P1 - Applique une remise supplémentaire (plafonnée par tier) aux factures en cours des clients du tier indiqué, et crédite des points fidélité associés.';
+COMMENT ON PROCEDURE public.apply_loyalty_tier_discount(IN p_tier character varying, IN p_extra_pct numeric) IS 'P1 - Applies an extra discount (capped per tier) to the in-progress bills of customers of the given tier, and credits matching loyalty points.';
 
 
 --
@@ -242,7 +242,7 @@ CREATE FUNCTION public.calculate_period_revenue(p_start date, p_end date) RETURN
     LANGUAGE plpgsql
     AS $$
 DECLARE
-    -- ----- 1. Curseur explicite -----
+    -- ----- 1. Explicit cursor -----
     cur_bills CURSOR (s DATE, e DATE) FOR
         SELECT b.bill_id,
                b.final_amount,
@@ -259,25 +259,25 @@ DECLARE
     v_skipped       INT           := 0;
     v_avg           NUMERIC(14,2);
 BEGIN
-    -- ---------- 2. Validation des arguments ----------
+    -- ---------- 2. Argument validation ----------
     IF p_start IS NULL OR p_end IS NULL THEN
-        RAISE EXCEPTION 'Les bornes de la période ne peuvent pas être NULL.'
+        RAISE EXCEPTION 'Period bounds cannot be NULL.'
             USING ERRCODE = '22023';
     END IF;
 
     IF p_end < p_start THEN
-        RAISE EXCEPTION 'Période invalide : la date de fin (%) précède la date de début (%).',
+        RAISE EXCEPTION 'Invalid period: end date (%) precedes start date (%).',
                         p_end, p_start
             USING ERRCODE = '22023';
     END IF;
 
-    -- ---------- 3. Parcours explicite du curseur ----------
+    -- ---------- 3. Walk the cursor explicitly ----------
     OPEN cur_bills(p_start, p_end);
     LOOP
         FETCH cur_bills INTO rec_bill;
         EXIT WHEN NOT FOUND;
 
-        -- Branche : on filtre les commandes annulées
+        -- Branch: skip cancelled orders
         IF rec_bill.order_status = 'Cancelled' THEN
             v_skipped := v_skipped + 1;
             CONTINUE;
@@ -288,27 +288,27 @@ BEGIN
     END LOOP;
     CLOSE cur_bills;
 
-    -- ---------- 4. Aucune facture trouvée -> exception ----------
+    -- ---------- 4. No bill found -> raise exception ----------
     IF v_kept = 0 THEN
-        RAISE EXCEPTION 'Aucune facture exploitable entre % et % (skipped=%).',
+        RAISE EXCEPTION 'No exploitable bill between % and % (skipped=%).',
                         p_start, p_end, v_skipped
             USING ERRCODE = 'P0002';   -- NO_DATA_FOUND
     END IF;
 
-    -- ---------- 5. Calcul moyenne (démontre division_by_zero) ----------
+    -- ---------- 5. Average computation (showcases division_by_zero) ----------
     v_avg := v_total / v_kept;
 
-    RAISE NOTICE 'Période %..% : factures gardées=%, ignorées=%, revenu=% (avg=%)',
+    RAISE NOTICE 'Period %..%: kept=%, skipped=%, revenue=% (avg=%)',
         p_start, p_end, v_kept, v_skipped, v_total, v_avg;
 
     RETURN v_total;
 
 EXCEPTION
     WHEN division_by_zero THEN
-        RAISE NOTICE 'calculate_period_revenue : division par zéro inattendue.';
+        RAISE NOTICE 'calculate_period_revenue: unexpected division by zero.';
         RETURN 0;
     WHEN OTHERS THEN
-        RAISE NOTICE 'calculate_period_revenue : ERREUR % - %', SQLSTATE, SQLERRM;
+        RAISE NOTICE 'calculate_period_revenue: ERROR % - %', SQLSTATE, SQLERRM;
         RAISE;
 END;
 $$;
@@ -320,7 +320,7 @@ ALTER FUNCTION public.calculate_period_revenue(p_start date, p_end date) OWNER T
 -- Name: FUNCTION calculate_period_revenue(p_start date, p_end date); Type: COMMENT; Schema: public; Owner: admin
 --
 
-COMMENT ON FUNCTION public.calculate_period_revenue(p_start date, p_end date) IS 'F2 - Calcule le revenu net entre deux dates en parcourant explicitement les factures, en ignorant les commandes annulées.';
+COMMENT ON FUNCTION public.calculate_period_revenue(p_start date, p_end date) IS 'F2 - Computes the net revenue between two dates by walking the bills explicitly, skipping cancelled orders.';
 
 
 --
@@ -335,26 +335,26 @@ DECLARE
     v_points        INT;
     v_default_reason INT;
 BEGIN
-    -- 1. On ne réagit que si final_amount a vraiment changé
+    -- 1. Only react if final_amount actually changed
     IF NEW.final_amount IS NOT DISTINCT FROM OLD.final_amount THEN
         RETURN NEW;
     END IF;
 
-    -- 2. Récupérer le client lié à la commande -> à la facture
+    -- 2. Find the customer linked to the order -> bill
     SELECT o.customer_id, l.loyalty_id
       INTO rec_link
       FROM "ORDER"  o
       LEFT JOIN loyalty l ON l.customer_id = o.customer_id
      WHERE o.order_id = NEW.order_id;
 
-    -- Pas de client OU pas d'enregistrement loyalty -> on ne récompense pas
+    -- No customer OR no loyalty record -> do not reward
     IF NOT FOUND OR rec_link.customer_id IS NULL OR rec_link.loyalty_id IS NULL THEN
         INSERT INTO loyalty_audit_log(bill_id, customer_id, points_awarded, old_amount, new_amount)
         VALUES (NEW.bill_id, rec_link.customer_id, 0, OLD.final_amount, NEW.final_amount);
         RETURN NEW;
     END IF;
 
-    -- 3. Calcul des points : 1 point / 10€ de la NOUVELLE facture
+    -- 3. Compute points: 1 point per 10 € of the NEW bill
     v_points := GREATEST(FLOOR(NEW.final_amount / 10)::INT, 0);
 
     IF v_points = 0 THEN
@@ -363,13 +363,13 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    -- 4. UPDATE de loyalty.points
+    -- 4. UPDATE loyalty.points
     UPDATE loyalty
        SET points       = points + v_points,
            last_updated = CURRENT_DATE
      WHERE loyalty_id = rec_link.loyalty_id;
 
-    -- 5. INSERT loyalty_transaction (raison par défaut = 1ère raison existante)
+    -- 5. INSERT loyalty_transaction (default reason = first available reason)
     SELECT reason_id INTO v_default_reason FROM reason ORDER BY reason_id LIMIT 1;
 
     IF v_default_reason IS NOT NULL THEN
@@ -380,7 +380,7 @@ BEGIN
         );
     END IF;
 
-    -- 6. Trace dans loyalty_audit_log
+    -- 6. Trace into loyalty_audit_log
     INSERT INTO loyalty_audit_log(bill_id, customer_id, points_awarded, old_amount, new_amount)
     VALUES (NEW.bill_id, rec_link.customer_id, v_points, OLD.final_amount, NEW.final_amount);
 
@@ -388,7 +388,7 @@ BEGIN
 
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'Trigger T2 : ERREUR % - %', SQLSTATE, SQLERRM;
+        RAISE NOTICE 'Trigger T2: ERROR % - %', SQLSTATE, SQLERRM;
         RAISE;
 END;
 $$;
@@ -400,7 +400,7 @@ ALTER FUNCTION public.fn_award_loyalty_points_on_bill_update() OWNER TO admin;
 -- Name: FUNCTION fn_award_loyalty_points_on_bill_update(); Type: COMMENT; Schema: public; Owner: admin
 --
 
-COMMENT ON FUNCTION public.fn_award_loyalty_points_on_bill_update() IS 'T2 - À chaque UPDATE de BILL.final_amount, ajoute des points fidélité au client (1 / 10€) et trace dans loyalty_audit_log.';
+COMMENT ON FUNCTION public.fn_award_loyalty_points_on_bill_update() IS 'T2 - On every UPDATE of BILL.final_amount, credits loyalty points to the customer (1 per 10 €) and traces into loyalty_audit_log.';
 
 
 --
@@ -413,7 +413,7 @@ CREATE FUNCTION public.fn_validate_payment_amount() RETURNS trigger
 DECLARE
     v_bill_total NUMERIC(10,2);
 BEGIN
-    -- Curseur implicite : SELECT ... INTO
+    -- Implicit cursor: SELECT ... INTO
     SELECT b.final_amount
       INTO v_bill_total
       FROM bill b
@@ -421,20 +421,20 @@ BEGIN
 
     IF NOT FOUND THEN
         RAISE EXCEPTION
-            'Trigger T1 : la facture % référencée par le paiement n''existe pas.',
+            'Trigger T1: bill % referenced by the payment does not exist.',
             NEW.bill_id
             USING ERRCODE = 'P0002';
     END IF;
 
-    -- Branche : montant > total facture -> rejet
+    -- Branch: payment amount > bill total -> reject
     IF NEW.amount > v_bill_total THEN
         RAISE EXCEPTION
-            'Trigger T1 : paiement % > montant facture % (bill_id=%).',
+            'Trigger T1: payment % > bill amount % (bill_id=%).',
             NEW.amount, v_bill_total, NEW.bill_id
             USING ERRCODE = '23514';     -- check_violation
     END IF;
 
-    -- Cohérence : si payment_time est NULL, on le fixe à maintenant
+    -- Consistency: if payment_time is NULL, set it to now
     IF NEW.payment_time IS NULL THEN
         NEW.payment_time := CURRENT_TIMESTAMP;
     END IF;
@@ -450,7 +450,7 @@ ALTER FUNCTION public.fn_validate_payment_amount() OWNER TO admin;
 -- Name: FUNCTION fn_validate_payment_amount(); Type: COMMENT; Schema: public; Owner: admin
 --
 
-COMMENT ON FUNCTION public.fn_validate_payment_amount() IS 'T1 - Empêche l''enregistrement d''un paiement supérieur au final_amount de la facture associée, et complète payment_time si NULL.';
+COMMENT ON FUNCTION public.fn_validate_payment_amount() IS 'T1 - Prevents recording a payment that exceeds the final_amount of the associated bill, and fills payment_time when NULL.';
 
 
 --
@@ -467,23 +467,23 @@ DECLARE
     v_perf            VARCHAR(10);
     v_inserted        INT           := 0;
 BEGIN
-    -- ---------- 1. Validation des paramètres ----------
+    -- ---------- 1. Parameter validation ----------
     IF p_year IS NULL OR p_month IS NULL THEN
-        RAISE EXCEPTION 'Année et mois ne peuvent pas être NULL.'
+        RAISE EXCEPTION 'Year and month cannot be NULL.'
             USING ERRCODE = '22023';
     END IF;
 
     IF p_month < 1 OR p_month > 12 THEN
-        RAISE EXCEPTION 'Mois invalide (reçu : %).', p_month
+        RAISE EXCEPTION 'Invalid month (got: %).', p_month
             USING ERRCODE = '22023';
     END IF;
 
-    -- ---------- 2. Purge des anciens enregistrements pour ce (year, month) ----------
+    -- ---------- 2. Purge previous rows for this (year, month) ----------
     DELETE FROM MONTHLY_WAITER_REPORT
      WHERE report_year  = p_year
        AND report_month = p_month;
 
-    -- ---------- 3. Curseur IMPLICITE : FOR rec IN <query> ----------
+    -- ---------- 3. IMPLICIT cursor: FOR rec IN <query> ----------
     FOR rec IN
         SELECT o.waiter_id,
                COUNT(DISTINCT o.order_id)              AS nb_orders,
@@ -496,7 +496,7 @@ BEGIN
          GROUP BY o.waiter_id
          ORDER BY total_revenue DESC
     LOOP
-        -- Branchement : niveau de performance
+        -- Branching: performance level
         IF rec.total_revenue >= 1500 THEN
             v_perf := 'HIGH';
         ELSIF rec.total_revenue >= 500 THEN
@@ -505,7 +505,7 @@ BEGIN
             v_perf := 'LOW';
         END IF;
 
-        -- DML : INSERT dans la table de rapport
+        -- DML: INSERT into the report table
         INSERT INTO MONTHLY_WAITER_REPORT(
             report_year, report_month, waiter_id,
             nb_orders, total_revenue, avg_bill, perf_level
@@ -524,19 +524,19 @@ BEGIN
             rec.waiter_id, rec.nb_orders, rec.total_revenue, v_perf;
     END LOOP;
 
-    -- ---------- 4. Vérification : si rien trouvé, lever exception ----------
+    -- ---------- 4. Sanity check: nothing found -> raise exception ----------
     IF v_inserted = 0 THEN
-        RAISE EXCEPTION 'Aucune commande trouvée pour %-%. Aucun rapport généré.',
+        RAISE EXCEPTION 'No order found for %-%. No report generated.',
                         p_year, p_month
             USING ERRCODE = 'P0002';
     END IF;
 
-    RAISE NOTICE '=== Rapport %-% terminé : % serveurs, % commandes, revenu total = % ===',
+    RAISE NOTICE '=== Report %-% done: % waiters, % orders, total revenue = % ===',
         p_year, p_month, v_inserted, v_total_orders, v_total_revenue;
 
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'generate_monthly_waiter_report : ERREUR % - %', SQLSTATE, SQLERRM;
+        RAISE NOTICE 'generate_monthly_waiter_report: ERROR % - %', SQLSTATE, SQLERRM;
         RAISE;
 END;
 $$;
@@ -548,7 +548,7 @@ ALTER PROCEDURE public.generate_monthly_waiter_report(IN p_year integer, IN p_mo
 -- Name: PROCEDURE generate_monthly_waiter_report(IN p_year integer, IN p_month integer); Type: COMMENT; Schema: public; Owner: admin
 --
 
-COMMENT ON PROCEDURE public.generate_monthly_waiter_report(IN p_year integer, IN p_month integer) IS 'P2 - Calcule et persiste les KPI mensuels par serveur dans MONTHLY_WAITER_REPORT, classifie chaque serveur (LOW/MEDIUM/HIGH).';
+COMMENT ON PROCEDURE public.generate_monthly_waiter_report(IN p_year integer, IN p_month integer) IS 'P2 - Computes and persists monthly per-waiter KPIs into MONTHLY_WAITER_REPORT, classifying each waiter (LOW/MEDIUM/HIGH).';
 
 
 --
@@ -561,21 +561,21 @@ CREATE FUNCTION public.get_top_loyalty_customers(p_tier character varying, p_min
 DECLARE
     v_count INT;
 BEGIN
-    -- ---------- 1. Validation des arguments ----------
+    -- ---------- 1. Argument validation ----------
     IF p_tier NOT IN ('Bronze','Silver','Gold','Platinum') THEN
         RAISE EXCEPTION
-            'Tier invalide "%". Valeurs autorisées : Bronze, Silver, Gold, Platinum.',
+            'Invalid tier "%". Allowed values: Bronze, Silver, Gold, Platinum.',
             p_tier
             USING ERRCODE = '22023';
     END IF;
 
     IF p_min_orders < 0 THEN
-        RAISE EXCEPTION 'Le nombre minimal de commandes doit être >= 0 (reçu : %).',
+        RAISE EXCEPTION 'Minimum order count must be >= 0 (got: %).',
             p_min_orders
             USING ERRCODE = '22023';
     END IF;
 
-    -- ---------- 2. Vérifier qu'il existe au moins un client matching ----------
+    -- ---------- 2. Make sure at least one customer matches ----------
     SELECT COUNT(*)
       INTO v_count
       FROM customer            c
@@ -584,12 +584,12 @@ BEGIN
       WHERE lt.level = p_tier;
 
     IF v_count = 0 THEN
-        RAISE EXCEPTION 'Aucun client trouvé pour le tier "%".', p_tier
-            USING ERRCODE = 'P0002';   -- équivalent NO_DATA_FOUND
+        RAISE EXCEPTION 'No customer found for tier "%".', p_tier
+            USING ERRCODE = 'P0002';   -- equivalent to NO_DATA_FOUND
     END IF;
 
-    -- ---------- 3. Ouvrir le REF CURSOR ----------
-    -- Sélection enrichie d'une catégorie de récompense calculée par CASE.
+    -- ---------- 3. Open the REF CURSOR ----------
+    -- The SELECT enriches each row with a reward category derived via CASE.
     OPEN p_cursor FOR
         SELECT
             c.customer_id,
@@ -614,16 +614,16 @@ BEGIN
         HAVING     COUNT(DISTINCT o.order_id) >= p_min_orders
         ORDER BY   total_revenue DESC, l.points DESC;
 
-    RAISE NOTICE 'Curseur "%" ouvert : tier=% / min_orders=% / clients_dispo=%',
+    RAISE NOTICE 'Cursor "%" opened: tier=% / min_orders=% / matching_customers=%',
                  p_cursor, p_tier, p_min_orders, v_count;
 
     RETURN p_cursor;
 
 EXCEPTION
     WHEN OTHERS THEN
-        RAISE NOTICE 'get_top_loyalty_customers : ERREUR % - %',
+        RAISE NOTICE 'get_top_loyalty_customers: ERROR % - %',
             SQLSTATE, SQLERRM;
-        RAISE;       -- on relance pour signaler l'échec à l'appelant
+        RAISE;       -- re-raise to signal the failure to the caller
 END;
 $$;
 
@@ -634,7 +634,7 @@ ALTER FUNCTION public.get_top_loyalty_customers(p_tier character varying, p_min_
 -- Name: FUNCTION get_top_loyalty_customers(p_tier character varying, p_min_orders integer, p_cursor refcursor); Type: COMMENT; Schema: public; Owner: admin
 --
 
-COMMENT ON FUNCTION public.get_top_loyalty_customers(p_tier character varying, p_min_orders integer, p_cursor refcursor) IS 'F1 - Retourne un REF CURSOR sur les meilleurs clients d''un tier de fidélité, classés par revenu, avec une catégorie de récompense calculée.';
+COMMENT ON FUNCTION public.get_top_loyalty_customers(p_tier character varying, p_min_orders integer, p_cursor refcursor) IS 'F1 - Returns a REF CURSOR over the top customers of a given loyalty tier, ordered by revenue, with a derived reward category.';
 
 
 --
@@ -928,7 +928,7 @@ ALTER TABLE public.loyalty_audit_log OWNER TO admin;
 -- Name: TABLE loyalty_audit_log; Type: COMMENT; Schema: public; Owner: admin
 --
 
-COMMENT ON TABLE public.loyalty_audit_log IS 'Journal d''audit du trigger T2 : trace chaque ajout automatique de points fidélité après mise à jour d''une facture.';
+COMMENT ON TABLE public.loyalty_audit_log IS 'Audit log for trigger T2: traces every automatic loyalty-points credit emitted after a BILL update.';
 
 
 --
@@ -979,7 +979,7 @@ ALTER TABLE public.monthly_waiter_report OWNER TO admin;
 -- Name: TABLE monthly_waiter_report; Type: COMMENT; Schema: public; Owner: admin
 --
 
-COMMENT ON TABLE public.monthly_waiter_report IS 'Rapport mensuel des performances par serveur, alimenté par la procédure P2.';
+COMMENT ON TABLE public.monthly_waiter_report IS 'Monthly per-waiter performance report, populated by procedure P2.';
 
 
 --
@@ -43271,9 +43271,6 @@ COPY public.monthly_waiter_report (report_id, report_year, report_month, waiter_
 --
 
 COPY public.order_item (order_item_id, order_id, menu_item_id, quantity, special_request) FROM stdin;
-1	101	50	2	Sans oignons sur une pizza
-2	101	75	2	Glaçons à part
-3	102	55	1	Cuit à point
 4	264	16	3	Allergic to nuts
 5	26	30	3	No salt
 6	366	95	9	\N
@@ -43425,6 +43422,9 @@ COPY public.order_item (order_item_id, order_id, menu_item_id, quantity, special
 152	202	18	2	No salt
 153	294	60	8	\N
 154	250	21	10	Well done
+1	101	50	2	No onions on the pizza
+2	101	75	2	Ice on the side
+3	102	55	1	Cooked medium
 155	97	7	1	Well done
 156	221	73	6	\N
 157	362	29	2	\N
