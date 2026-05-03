@@ -833,10 +833,10 @@ As part of this integration, SQL views were created from both the perspective of
 ![DSD](docs/DSD.png)
 
 ### ERD (Customer / Reservations / Loyalty — imported department)
-![ERD](שלב_ג/Group2_erd.png)
+![ERD](שלב_ג/group2-erd.png)
 
 ### DSD (Customer / Reservations / Loyalty — imported department)
-![DSD](שלב_ג/Group2_dsd.png)
+![DSD](שלב_ג/group2-dsd.png)
 
 ### ERD (Integration)
 ![ERD](שלב_ג/merge_erd.png)
@@ -1432,7 +1432,7 @@ The result is a unified database of **15 tables** and **~58 000 rows** offering 
 | `Views.sql` | 3 views + 6 analytical queries |
 | `backup3.sql` | Full dump of `restaurant_db` after integration |
 | `merge_dsd.png` / `merge_erd.png` | Integrated schema diagrams |
-| `Group2_dsd.png` / `Group2_erd.png` | Imported department diagrams |
+| `group2-dsd.png` / `group2-erd.png` | Imported department diagrams |
 | `*.erdplus` | Editable ERDPlus sources for each diagram |
 | `restore_other_group_db.sh` | Script to restore the received backup into `other_group_db` |
 | `דוח_פרויקט_שלב_ג.md` | Stand-alone French project report |
