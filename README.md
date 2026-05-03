@@ -824,7 +824,7 @@ As part of this integration, SQL views were created from both the perspective of
 
 ---
 
-## 🗂️ ERD and DSD Diagrams
+## 📜 ERD and DSD Diagrams
 
 ### ERD (Order & Billing — our department)
 ![ERD](docs/ERD.png)
