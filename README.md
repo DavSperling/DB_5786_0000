@@ -1079,7 +1079,7 @@ The full integration script is in [`שלב_ג/Integrate.sql`](שלב_ג/Integrat
 
 ---
 
-## 👁️ Views and Analytical Queries
+## 📊 Views and Analytical Queries
 
 This section presents the **3 SQL views** created as part of Stage 3, providing analytical insights from each department's perspective and one integrated cross-department view. Each view is accompanied by a description, definition, and 2 analytical queries with results.
 
