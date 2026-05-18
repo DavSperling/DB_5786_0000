@@ -2233,6 +2233,160 @@ Combined with Stages 1–3, the database now exposes a complete server-side tool
 
 ---
 
+---
+
+## 🖥️ Stage 5 — Graphical User Interface
+
+### Overview
+
+Stage 5 adds a full desktop GUI for the restaurant database, built with **Python + CustomTkinter**.  
+The application is named **La Bella Cucina OS v2.0** and covers all tables from every integration stage.
+
+---
+
+### Tools & Technologies
+
+| Tool | Role |
+|------|------|
+| Python 3.11+ | Application language |
+| CustomTkinter 5.2 | Modern dark-themed GUI framework |
+| psycopg2-binary | PostgreSQL driver |
+| Docker (existing) | Hosts the PostgreSQL database |
+
+---
+
+### File Structure
+
+```
+שלב_ה/
+├── INSTRUCTIONS.md          ← Full setup & launch guide
+└── gui/
+    ├── main.py              ← Entry point
+    ├── config.py            ← DB credentials + app colors
+    ├── db.py                ← Database manager (all queries)
+    ├── requirements.txt
+    └── screens/
+        ├── login.py         ← Login screen
+        ├── main_app.py      ← Sidebar shell + screen router
+        ├── dashboard.py     ← Live stats overview
+        ├── widgets.py       ← Shared UI components
+        ├── orders.py        ← ORDER CRUD
+        ├── items.py         ← ORDER_ITEM CRUD
+        ├── bills.py         ← BILL CRUD
+        ├── payments.py      ← PAYMENT CRUD
+        ├── discounts.py     ← DISCOUNT CRUD
+        ├── customers.py     ← Customers / Loyalty / Reservations (read)
+        ├── queries.py       ← Stage 2 query runner (6 queries)
+        └── programs.py      ← Stage 4 function & procedure runner
+```
+
+---
+
+### How to Launch
+
+```bash
+# 1. Start the database
+docker-compose up -d
+
+# 2. Install dependencies
+cd שלב_ה/gui
+pip install -r requirements.txt
+
+# 3. Run the app
+python3 main.py
+```
+
+Login: **admin / admin123**
+
+---
+
+### Screens
+
+#### Login Screen
+Centered card with hashed credential validation (SHA-256). Pressing Enter submits the form.
+
+#### Dashboard
+Live stat cards (Orders, Bills, Payments, Discounts, Customers), order status breakdown by colour, and revenue summary (Total / Tax / Average).
+
+#### CRUD Screens (Orders, Order Items, Bills, Payments, Discounts)
+Each screen follows the same layout:
+- **Left panel (60%)** — scrollable Treeview with FK-resolved names (customer full name instead of ID, tier level instead of tier_id, etc.)
+- **Right panel (40%)** — tabbed form with three operations:
+  - **Insert** — fill in fields and submit
+  - **Update** — enter the primary key → click **Load** → system fetches the row → edit → submit
+  - **Delete** — enter or click a row → confirm dialog → delete
+
+Foreign key display rules:
+| Raw column | Displayed as |
+|------------|-------------|
+| `customer_id` | `First Last` (JOIN to customer) |
+| `waiter_id` | `Waiter #3` |
+| `table_id` | `Table #7` |
+| `menu_item_id` | `Item #12` |
+| `tier_id` | `Gold` (JOIN to loyalty_tier) |
+| `discount_id` | Discount name (JOIN to discount) |
+
+#### Customers Screen
+Read-only multi-view browser with a dropdown to switch between:
+- **Customers** — order count, total spent, avg bill, last order
+- **Loyalty Status** — tier, points, transaction count, reservations
+- **Cross Activity (360°)** — engagement type per customer
+- **Reservations** — with customer name and status description
+- **Waitlist** — with customer name and status description
+- **Loyalty Transactions** — with reason text
+- **Feedback** — with customer name and comment
+
+Supports free-text search by name or email.
+
+#### Queries Screen (Stage 2)
+Dropdown selector with 6 queries, each with editable parameters:
+
+| # | Query | Parameters |
+|---|-------|------------|
+| Q1 | Orders with Billing & Payment | Max rows |
+| Q2 | Bills with Discounts (savings) | Max rows |
+| Q3 | Waiter Monthly Performance | Year |
+| Q4 | Payment Method Statistics | Year |
+| Q5 | Daily Revenue Report | Year |
+| Q6 | Cancelled Orders with Items | Max rows |
+
+Results appear in a dynamic Treeview below the selector.
+
+#### Programs Screen (Stage 4)
+Four runnable cards:
+
+| Card | Type | Inputs |
+|------|------|--------|
+| **F1** `get_top_loyalty_customers` | Function (REF CURSOR) | Tier, Min Orders |
+| **F2** `calculate_period_revenue` | Function (scalar) | Start date, End date |
+| **P1** `apply_loyalty_tier_discount` | Procedure | Tier, Extra % |
+| **P2** `generate_monthly_waiter_report` | Procedure | Year, Month |
+| **View Report** | Query | Year, Month |
+
+- F1 results render as a table.
+- F2 shows the scalar revenue value.
+- P1/P2 output captured PostgreSQL NOTICE messages.
+- P2 results can be browsed immediately with the embedded report viewer.
+
+---
+
+### Security
+
+- All SQL uses **parameterized queries** (`%s` placeholders via psycopg2) — no string interpolation.
+- Passwords stored as **SHA-256 hashes** in the credential dict.
+- Database credentials loaded from the existing `.env` file (never hard-coded beyond fallback defaults).
+- Every write operation is wrapped in a **try/except + rollback** block.
+- User-facing error messages never expose raw stack traces.
+
+---
+
+### Screenshots
+
+> *Screenshots to be added after running the application with Docker active.*
+> Launch with `docker-compose up -d && cd שלב_ה/gui && python3 main.py`
+
+---
+
 ## 📄 License
 
 This project is for academic purposes only.
